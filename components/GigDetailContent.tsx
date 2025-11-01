@@ -7,6 +7,7 @@ import type { User } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import Navigation from './Navigation'
+import { generateGoogleCalendarLink, downloadICalFile } from '@/lib/calendar'
 
 export default function GigDetailContent({
   gigId,
@@ -210,9 +211,28 @@ export default function GigDetailContent({
         .neq('id', applicationId)
         .eq('status', 'pending')
 
-      setSuccess('Application accepted!')
+      // Send calendar invitation email to the accepted musician
+      try {
+        const emailResponse = await fetch('/api/gigs/send-calendar-invite', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ applicationId }),
+        })
+
+        if (!emailResponse.ok) {
+          console.error('Failed to send calendar invite email:', await emailResponse.text())
+          // Don't fail the acceptance if email fails
+        }
+      } catch (emailError) {
+        console.error('Error sending calendar invite email:', emailError)
+        // Don't fail the acceptance if email fails
+      }
+
+      setSuccess('Application accepted! Calendar invitation email sent.')
       await loadGig()
-      setTimeout(() => setSuccess(null), 3000)
+      setTimeout(() => setSuccess(null), 5000)
     } catch (error: any) {
       console.error('Error accepting application:', error)
       setError(error.message)
@@ -390,6 +410,9 @@ export default function GigDetailContent({
                         {acceptedApp ? (
                           <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
                             Filled by {acceptedApp.musician?.name || 'Unknown'}
+                            {acceptedApp.musician_id === user.id && (
+                              <span className="ml-1">(You)</span>
+                            )}
                           </span>
                         ) : (
                           <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
@@ -397,6 +420,37 @@ export default function GigDetailContent({
                           </span>
                         )}
                       </div>
+
+                      {acceptedApp && acceptedApp.musician_id === user.id && (
+                        <div className="mb-2 flex flex-wrap gap-2">
+                          <a
+                            href={generateGoogleCalendarLink({
+                              title: `${gig.title} - ${instrument}`,
+                              description: gig.description || `Playing ${instrument} at ${gig.title}`,
+                              location: gig.location,
+                              startTime: new Date(gig.datetime),
+                            })}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                          >
+                            📅 Add to Google Calendar
+                          </a>
+                          <button
+                            onClick={() => {
+                              downloadICalFile({
+                                title: `${gig.title} - ${instrument}`,
+                                description: gig.description || `Playing ${instrument} at ${gig.title}`,
+                                location: gig.location,
+                                startTime: new Date(gig.datetime),
+                              })
+                            }}
+                            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            📥 Download .ics
+                          </button>
+                        </div>
+                      )}
 
                       {canClaim && (
                         <button
@@ -460,37 +514,75 @@ export default function GigDetailContent({
                               <div className="space-y-2">
                                 {instrumentApps
                                   .filter((app) => app.status !== 'pending')
-                                  .map((app) => (
-                                    <div
-                                      key={app.id}
-                                      className={`flex items-center justify-between rounded-md p-3 ${
-                                        app.status === 'accepted'
-                                          ? 'bg-green-50 border border-green-200'
-                                          : 'bg-gray-50 border border-gray-200'
-                                      }`}
-                                    >
-                                      <div>
-                                        <p className="text-sm font-medium text-gray-900">
-                                          {app.musician?.name || 'Unknown'}
-                                        </p>
-                                        <p className="text-xs text-gray-600">
-                                          {app.musician?.email || 'No email'}
-                                        </p>
-                                        <p className="mt-1 text-xs text-gray-500">
-                                          Applied: {format(new Date(app.created_at), 'PPp')}
-                                        </p>
-                                      </div>
-                                      <span
-                                        className={`ml-4 rounded-full px-3 py-1 text-xs font-medium ${
+                                  .map((app) => {
+                                    const isMyAcceptedApplication = app.status === 'accepted' && app.musician_id === user.id
+                                    const showCalendarLinks = app.status === 'accepted'
+                                    
+                                    return (
+                                      <div
+                                        key={app.id}
+                                        className={`flex items-center justify-between rounded-md p-3 ${
                                           app.status === 'accepted'
-                                            ? 'bg-green-100 text-green-800'
-                                            : 'bg-gray-100 text-gray-800'
+                                            ? 'bg-green-50 border border-green-200'
+                                            : 'bg-gray-50 border border-gray-200'
                                         }`}
                                       >
-                                        {app.status}
-                                      </span>
-                                    </div>
-                                  ))}
+                                        <div className="flex-1">
+                                          <p className="text-sm font-medium text-gray-900">
+                                            {app.musician?.name || 'Unknown'}
+                                            {isMyAcceptedApplication && (
+                                              <span className="ml-2 text-xs font-normal text-green-700">(You)</span>
+                                            )}
+                                          </p>
+                                          <p className="text-xs text-gray-600">
+                                            {app.musician?.email || 'No email'}
+                                          </p>
+                                          <p className="mt-1 text-xs text-gray-500">
+                                            Applied: {format(new Date(app.created_at), 'PPp')}
+                                          </p>
+                                          {showCalendarLinks && (
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                              <a
+                                                href={generateGoogleCalendarLink({
+                                                  title: `${gig.title} - ${app.instrument}`,
+                                                  description: gig.description || `Playing ${app.instrument} at ${gig.title}`,
+                                                  location: gig.location,
+                                                  startTime: new Date(gig.datetime),
+                                                })}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                                              >
+                                                📅 Add to Google Calendar
+                                              </a>
+                                              <button
+                                                onClick={() => {
+                                                  downloadICalFile({
+                                                    title: `${gig.title} - ${app.instrument}`,
+                                                    description: gig.description || `Playing ${app.instrument} at ${gig.title}`,
+                                                    location: gig.location,
+                                                    startTime: new Date(gig.datetime),
+                                                  })
+                                                }}
+                                                className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                              >
+                                                📥 Download .ics
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <span
+                                          className={`ml-4 rounded-full px-3 py-1 text-xs font-medium ${
+                                            app.status === 'accepted'
+                                              ? 'bg-green-100 text-green-800'
+                                              : 'bg-gray-100 text-gray-800'
+                                          }`}
+                                        >
+                                          {app.status}
+                                        </span>
+                                      </div>
+                                    )
+                                  })}
                               </div>
                             </div>
                           )}
