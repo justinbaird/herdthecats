@@ -1,27 +1,37 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
+// Force dynamic rendering (no static export)
+// This page must be rendered dynamically since it handles authentication callbacks with browser-only APIs
+export const dynamic = 'force-dynamic'
+
 export default function ConfirmEmailPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
     const confirmEmail = async () => {
+      if (typeof window === 'undefined') return
+      
       const supabase = createClient()
       
-      // Get the token and type from URL hash
+      // Get the token and type from URL hash (Supabase redirects with hash params)
       const hashParams = new URLSearchParams(window.location.hash.substring(1))
       const accessToken = hashParams.get('access_token')
       const tokenType = hashParams.get('type')
       const error = hashParams.get('error')
       const errorDescription = hashParams.get('error_description')
+
+      // Also check query params (alternative flow)
+      const queryParams = new URLSearchParams(window.location.search)
+      const token = queryParams.get('token')
+      const type = queryParams.get('type')
 
       // Handle errors from URL
       if (error) {
@@ -30,7 +40,7 @@ export default function ConfirmEmailPage() {
         return
       }
 
-      // If we have an access token, the email is already confirmed
+      // If we have an access token in hash, the email is already confirmed
       // We just need to set the session
       if (accessToken && tokenType === 'recovery') {
         // This is a password reset flow
@@ -39,7 +49,7 @@ export default function ConfirmEmailPage() {
       }
 
       if (accessToken) {
-        // Email confirmation successful
+        // Email confirmation successful - session is already set
         setSuccess(true)
         setLoading(false)
         
@@ -48,13 +58,12 @@ export default function ConfirmEmailPage() {
           router.push('/dashboard')
           router.refresh()
         }, 2000)
-      } else {
-        // Try to get session from query params (alternative flow)
-        const token = searchParams.get('token')
-        const type = searchParams.get('type')
+        return
+      }
 
-        if (token && type === 'signup') {
-          // Verify the token and confirm email
+      // Try OTP verification if we have token in query params
+      if (token && type === 'signup') {
+        try {
           const { error: verifyError } = await supabase.auth.verifyOtp({
             token_hash: token,
             type: 'signup',
@@ -62,24 +71,42 @@ export default function ConfirmEmailPage() {
 
           if (verifyError) {
             setError(verifyError.message)
+            setLoading(false)
           } else {
             setSuccess(true)
+            setLoading(false)
             setTimeout(() => {
               router.push('/dashboard')
               router.refresh()
             }, 2000)
           }
-        } else {
-          // No token found - might already be confirmed or link expired
-          setError('Invalid or expired confirmation link. Please try signing up again or contact support.')
+        } catch (err: any) {
+          setError(err.message || 'An error occurred during verification')
+          setLoading(false)
         }
-        
-        setLoading(false)
+        return
       }
+
+      // Check if user is already authenticated (link might have already been used)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        // User is already logged in, might have already confirmed
+        setSuccess(true)
+        setLoading(false)
+        setTimeout(() => {
+          router.push('/dashboard')
+          router.refresh()
+        }, 1000)
+        return
+      }
+
+      // No token found - might already be confirmed or link expired
+      setError('Invalid or expired confirmation link. Please try signing up again or contact support.')
+      setLoading(false)
     }
 
     confirmEmail()
-  }, [router, searchParams])
+  }, [router])
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
