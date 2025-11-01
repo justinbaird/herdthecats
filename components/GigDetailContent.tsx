@@ -325,7 +325,6 @@ export default function GigDetailContent({
                     (app) => app.status === 'accepted'
                   )
                   const canClaim =
-                    !isGigPoster &&
                     gig.status === 'open' &&
                     !acceptedApp &&
                     myInstruments.includes(instrument) &&
