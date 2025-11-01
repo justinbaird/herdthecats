@@ -25,6 +25,11 @@ export default function GigDetailContent({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [claiming, setClaiming] = useState<string | null>(null)
+  const [invitations, setInvitations] = useState<any[]>([])
+  const [managingInvitesFor, setManagingInvitesFor] = useState<string | null>(null)
+  const [inviteSearchEmail, setInviteSearchEmail] = useState('')
+  const [inviteSearchResults, setInviteSearchResults] = useState<any[]>([])
+  const [inviting, setInviting] = useState(false)
 
   useEffect(() => {
     loadGig()
@@ -88,6 +93,32 @@ export default function GigDetailContent({
       } else {
         setApplications([])
       }
+
+      // Load invitations
+      const { data: invitesData, error: invitesError } = await supabase
+        .from('gig_invitations')
+        .select('*')
+        .eq('gig_id', gigId)
+
+      if (invitesError) throw invitesError
+
+      // Get musician profiles for invitations
+      if (invitesData && invitesData.length > 0) {
+        const inviteMusicianIds = invitesData.map((inv) => inv.musician_id)
+        const { data: inviteMusiciansData } = await supabase
+          .from('musicians')
+          .select('*')
+          .in('user_id', inviteMusicianIds)
+
+        const invitesWithMusicians = invitesData.map((inv) => ({
+          ...inv,
+          musician: inviteMusiciansData?.find((m) => m.user_id === inv.musician_id) || null,
+        }))
+
+        setInvitations(invitesWithMusicians)
+      } else {
+        setInvitations([])
+      }
     } catch (error: any) {
       console.error('Error loading gig:', error)
       setError(error.message)
@@ -105,6 +136,18 @@ export default function GigDetailContent({
     if (!musician.instruments.includes(instrument)) {
       setError(`You don't play ${instrument}. Please update your profile.`)
       return
+    }
+
+    // Check if slot is invite-only and if user is invited
+    const isInviteOnly = gig?.invite_only_instruments?.includes(instrument)
+    if (isInviteOnly) {
+      const isInvited = invitations.some(
+        (inv) => inv.instrument === instrument && inv.musician_id === user.id
+      )
+      if (!isInvited) {
+        setError(`${instrument} is invite-only. You must be invited by the gig poster to apply.`)
+        return
+      }
     }
 
     setClaiming(instrument)
@@ -268,8 +311,80 @@ export default function GigDetailContent({
     }
   }
 
-  const isGigPoster = gig?.posted_by === user.id
-  const myInstruments = musician?.instruments || []
+  const searchMusiciansForInvite = async (email: string) => {
+    if (!email.trim()) {
+      setInviteSearchResults([])
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('musicians')
+        .select('*')
+        .ilike('email', `%${email}%`)
+        .limit(10)
+
+      if (error) throw error
+      setInviteSearchResults(data || [])
+    } catch (error: any) {
+      console.error('Error searching musicians:', error)
+      setInviteSearchResults([])
+    }
+  }
+
+  const handleInviteMusician = async (musicianId: string, instrument: string) => {
+    if (gig.posted_by !== user.id) {
+      setError('Only the gig poster can send invitations')
+      return
+    }
+
+    setInviting(true)
+    try {
+      const { error } = await supabase
+        .from('gig_invitations')
+        .insert({
+          gig_id: gigId,
+          musician_id: musicianId,
+          instrument,
+        })
+
+      if (error) throw error
+
+      setSuccess('Invitation sent!')
+      setInviteSearchEmail('')
+      setInviteSearchResults([])
+      await loadGig()
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (error: any) {
+      console.error('Error sending invitation:', error)
+      setError(error.message || 'Failed to send invitation')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const handleRemoveInvitation = async (invitationId: string) => {
+    if (gig.posted_by !== user.id) {
+      setError('Only the gig poster can remove invitations')
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('gig_invitations')
+        .delete()
+        .eq('id', invitationId)
+
+      if (error) throw error
+
+      setSuccess('Invitation removed')
+      await loadGig()
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (error: any) {
+      console.error('Error removing invitation:', error)
+      setError(error.message)
+    }
+  }
 
   if (loading) {
     return (
@@ -286,6 +401,9 @@ export default function GigDetailContent({
       </div>
     )
   }
+
+  const isGigPoster = gig.posted_by === user.id
+  const myInstruments = musician?.instruments || []
 
   // Group applications by instrument
   const appsByInstrument: Record<string, any[]> = {}
@@ -396,6 +514,14 @@ export default function GigDetailContent({
                   const pendingApps = instrumentApps.filter(
                     (app) => app.status === 'pending'
                   )
+                  const isInviteOnly = gig.invite_only_instruments?.includes(instrument) || false
+                  const instrumentInvitations = invitations.filter(
+                    (inv) => inv.instrument === instrument
+                  )
+                  const isInvited = isInviteOnly && instrumentInvitations.some(
+                    (inv) => inv.musician_id === user.id
+                  )
+                  
                   const canClaim =
                     gig.status === 'open' &&
                     !acceptedApp &&
@@ -404,7 +530,8 @@ export default function GigDetailContent({
                       (app) =>
                         app.musician_id === user.id &&
                         (app.status === 'pending' || app.status === 'accepted')
-                    )
+                    ) &&
+                    (!isInviteOnly || isInvited)
 
                   return (
                     <div
@@ -412,7 +539,14 @@ export default function GigDetailContent({
                       className="rounded-md border border-gray-200 p-4"
                     >
                       <div className="mb-2 flex items-center justify-between">
-                        <h3 className="font-medium text-gray-900">{instrument}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-gray-900">{instrument}</h3>
+                          {isInviteOnly && (
+                            <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-800">
+                              Invite Only
+                            </span>
+                          )}
+                        </div>
                         {acceptedApp ? (
                           <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
                             Filled by {acceptedApp.musician?.name || 'Unknown'}
@@ -466,6 +600,113 @@ export default function GigDetailContent({
                         >
                           {claiming === instrument ? 'Claiming...' : 'Claim This Slot'}
                         </button>
+                      )}
+
+                      {isInviteOnly && !canClaim && !acceptedApp && (
+                        <p className="mt-2 text-sm text-purple-600">
+                          This slot is invite-only. Only invited musicians can apply.
+                        </p>
+                      )}
+
+                      {isGigPoster && isInviteOnly && (
+                        <div className="mt-3 rounded-md border border-purple-200 bg-purple-50 p-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <p className="text-sm font-semibold text-purple-900">
+                              Manage Invitations ({instrumentInvitations.length} invited)
+                            </p>
+                            <button
+                              onClick={() => {
+                                if (managingInvitesFor === instrument) {
+                                  setManagingInvitesFor(null)
+                                  setInviteSearchEmail('')
+                                  setInviteSearchResults([])
+                                } else {
+                                  setManagingInvitesFor(instrument)
+                                }
+                              }}
+                              className="text-xs text-purple-700 hover:text-purple-900 font-medium"
+                            >
+                              {managingInvitesFor === instrument ? 'Cancel' : 'Manage'}
+                            </button>
+                          </div>
+
+                          {instrumentInvitations.length > 0 && (
+                            <div className="mb-2 space-y-1">
+                              {instrumentInvitations.map((inv) => (
+                                <div
+                                  key={inv.id}
+                                  className="flex items-center justify-between rounded bg-white px-2 py-1 text-xs"
+                                >
+                                  <span className="text-gray-700">
+                                    {inv.musician?.name || 'Unknown'} ({inv.musician?.email})
+                                  </span>
+                                  <button
+                                    onClick={() => handleRemoveInvitation(inv.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {managingInvitesFor === instrument && (
+                            <div>
+                              <div className="flex gap-2 mb-2">
+                                <input
+                                  type="email"
+                                  value={inviteSearchEmail}
+                                  onChange={(e) => {
+                                    setInviteSearchEmail(e.target.value)
+                                    searchMusiciansForInvite(e.target.value)
+                                  }}
+                                  placeholder="Search by email..."
+                                  className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs text-gray-900"
+                                />
+                              </div>
+
+                              {inviteSearchResults.length > 0 && (
+                                <div className="space-y-1 max-h-32 overflow-y-auto">
+                                  {inviteSearchResults
+                                    .filter(
+                                      (m) =>
+                                        !instrumentInvitations.some(
+                                          (inv) => inv.musician_id === m.user_id
+                                        ) && m.instruments?.includes(instrument)
+                                    )
+                                    .map((musician) => (
+                                      <div
+                                        key={musician.user_id}
+                                        className="flex items-center justify-between rounded bg-white px-2 py-1 text-xs"
+                                      >
+                                        <span className="text-gray-700">
+                                          {musician.name} ({musician.email})
+                                        </span>
+                                        <button
+                                          onClick={() =>
+                                            handleInviteMusician(musician.user_id, instrument)
+                                          }
+                                          disabled={inviting}
+                                          className="text-purple-600 hover:text-purple-800 disabled:opacity-50"
+                                        >
+                                          {inviting ? 'Inviting...' : 'Invite'}
+                                        </button>
+                                      </div>
+                                    ))}
+                                </div>
+                              )}
+
+                              {inviteSearchEmail &&
+                                inviteSearchResults.length === 0 &&
+                                !inviting && (
+                                  <p className="text-xs text-gray-500">
+                                    No musicians found matching that email.
+                                  </p>
+                                )}
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {isGigPoster && (

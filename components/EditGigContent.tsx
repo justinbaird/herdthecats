@@ -25,6 +25,7 @@ export default function EditGigContent({
   const [location, setLocation] = useState('')
   const [datetime, setDatetime] = useState('')
   const [requiredInstruments, setRequiredInstruments] = useState<Instrument[]>([])
+  const [inviteOnlyInstruments, setInviteOnlyInstruments] = useState<Instrument[]>([])
 
   useEffect(() => {
     loadGig()
@@ -53,6 +54,7 @@ export default function EditGigContent({
         .slice(0, 16)
       setDatetime(localDatetime)
       setRequiredInstruments(gigData.required_instruments || [])
+      setInviteOnlyInstruments(gigData.invite_only_instruments || [])
     } catch (error: any) {
       console.error('Error loading gig:', error)
       setError(error.message)
@@ -64,6 +66,20 @@ export default function EditGigContent({
 
   const handleToggleInstrument = (instrument: Instrument) => {
     setRequiredInstruments((prev) =>
+      prev.includes(instrument)
+        ? prev.filter((i) => i !== instrument)
+        : [...prev, instrument]
+    )
+    // Remove from invite-only if removing from required
+    if (!requiredInstruments.includes(instrument)) {
+      setInviteOnlyInstruments((prev) => prev.filter((i) => i !== instrument))
+    }
+  }
+
+  const handleToggleInviteOnly = (instrument: Instrument) => {
+    if (!requiredInstruments.includes(instrument)) return
+    
+    setInviteOnlyInstruments((prev) =>
       prev.includes(instrument)
         ? prev.filter((i) => i !== instrument)
         : [...prev, instrument]
@@ -119,6 +135,7 @@ export default function EditGigContent({
           location,
           datetime: isoDatetime,
           required_instruments: requiredInstruments,
+          invite_only_instruments: inviteOnlyInstruments,
         })
         .eq('id', gigId)
         .eq('posted_by', user.id)
@@ -236,25 +253,53 @@ export default function EditGigContent({
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Required Instruments * (select all that apply)
                 </label>
+                <p className="mb-3 text-xs text-gray-500">
+                  Check instruments needed. You can mark any as "Invite Only" to restrict who can apply.
+                </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {INSTRUMENTS.map((instrument) => (
-                    <label
-                      key={instrument}
-                      className="flex items-center space-x-2 rounded-md border border-gray-300 p-3 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={requiredInstruments.includes(instrument)}
-                        onChange={() => handleToggleInstrument(instrument)}
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <span className="text-sm text-gray-700">{instrument}</span>
-                    </label>
-                  ))}
+                  {INSTRUMENTS.map((instrument) => {
+                    const isRequired = requiredInstruments.includes(instrument)
+                    const isInviteOnly = inviteOnlyInstruments.includes(instrument)
+                    
+                    return (
+                      <div
+                        key={instrument}
+                        className="rounded-md border border-gray-300 p-3 hover:bg-gray-50"
+                      >
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isRequired}
+                            onChange={() => handleToggleInstrument(instrument)}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm text-gray-700 flex-1">{instrument}</span>
+                        </label>
+                        {isRequired && (
+                          <label className="mt-2 flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isInviteOnly}
+                              onChange={() => handleToggleInviteOnly(instrument)}
+                              className="h-3 w-3 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="text-xs text-purple-600 font-medium">
+                              Invite Only
+                            </span>
+                          </label>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
                 {requiredInstruments.length === 0 && (
                   <p className="mt-2 text-sm text-red-600">
                     Please select at least one instrument
+                  </p>
+                )}
+                {inviteOnlyInstruments.length > 0 && (
+                  <p className="mt-2 text-sm text-purple-600">
+                    {inviteOnlyInstruments.length} instrument(s) marked as invite-only. Manage invitations on the gig detail page.
                   </p>
                 )}
               </div>
