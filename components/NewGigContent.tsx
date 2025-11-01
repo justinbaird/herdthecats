@@ -21,42 +21,50 @@ export default function NewGigContent({ user }: { user: User }) {
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [numberOfSets, setNumberOfSets] = useState('')
-  const [requiredInstruments, setRequiredInstruments] = useState<Instrument[]>([])
-  const [inviteOnlyInstruments, setInviteOnlyInstruments] = useState<Instrument[]>([])
-  const [paymentPerInstrument, setPaymentPerInstrument] = useState<Record<Instrument, string>>({} as Record<Instrument, string>)
+  // Slots: array of { instruments: Instrument[], inviteOnly: boolean, payment: string }
+  const [slots, setSlots] = useState<Array<{ instruments: Instrument[], inviteOnly: boolean, payment: string }>>([{ instruments: [], inviteOnly: false, payment: '' }])
 
-  const handleToggleInstrument = (instrument: Instrument) => {
-    const wasRequired = requiredInstruments.includes(instrument)
-    setRequiredInstruments((prev) =>
-      prev.includes(instrument)
-        ? prev.filter((i) => i !== instrument)
-        : [...prev, instrument]
-    )
-    // Remove from invite-only and payment if removing from required
-    if (wasRequired) {
-      setInviteOnlyInstruments((prev) => prev.filter((i) => i !== instrument))
-      setPaymentPerInstrument((prev) => {
-        const updated = { ...prev }
-        delete updated[instrument]
-        return updated
-      })
+  // Slot management functions
+  const addSlot = () => {
+    setSlots((prev) => [...prev, { instruments: [], inviteOnly: false, payment: '' }])
+  }
+
+  const removeSlot = (slotIndex: number) => {
+    if (slots.length <= 1) {
+      setError('You must have at least one slot')
+      return
     }
+    setSlots((prev) => prev.filter((_, idx) => idx !== slotIndex))
   }
 
-  const handlePaymentChange = (instrument: Instrument, value: string) => {
-    setPaymentPerInstrument((prev) => ({
-      ...prev,
-      [instrument]: value,
-    }))
+  const toggleInstrumentInSlot = (slotIndex: number, instrument: Instrument) => {
+    setSlots((prev) =>
+      prev.map((slot, idx) =>
+        idx === slotIndex
+          ? {
+              ...slot,
+              instruments: slot.instruments.includes(instrument)
+                ? slot.instruments.filter((i) => i !== instrument)
+                : [...slot.instruments, instrument],
+            }
+          : slot
+      )
+    )
   }
 
-  const handleToggleInviteOnly = (instrument: Instrument) => {
-    if (!requiredInstruments.includes(instrument)) return
-    
-    setInviteOnlyInstruments((prev) =>
-      prev.includes(instrument)
-        ? prev.filter((i) => i !== instrument)
-        : [...prev, instrument]
+  const toggleInviteOnly = (slotIndex: number) => {
+    setSlots((prev) =>
+      prev.map((slot, idx) =>
+        idx === slotIndex ? { ...slot, inviteOnly: !slot.inviteOnly } : slot
+      )
+    )
+  }
+
+  const setPaymentForSlot = (slotIndex: number, value: string) => {
+    setSlots((prev) =>
+      prev.map((slot, idx) =>
+        idx === slotIndex ? { ...slot, payment: value } : slot
+      )
     )
   }
 
@@ -65,8 +73,10 @@ export default function NewGigContent({ user }: { user: User }) {
     setError(null)
     setLoading(true)
 
-    if (requiredInstruments.length === 0) {
-      setError('Please select at least one required instrument')
+    // Validate slots
+    const validSlots = slots.filter((slot) => slot.instruments.length > 0)
+    if (validSlots.length === 0) {
+      setError('Please add at least one slot with at least one instrument')
       setLoading(false)
       return
     }
@@ -113,6 +123,24 @@ export default function NewGigContent({ user }: { user: User }) {
         return
       }
 
+      // Prepare slot-based data
+      const instrumentSlots = validSlots.map((slot) => slot.instruments)
+      const inviteOnlySlots = validSlots
+        .map((slot, idx) => (slot.inviteOnly ? idx : null))
+        .filter((idx) => idx !== null) as number[]
+      const paymentPerSlot = validSlots
+        .map((slot, idx) => {
+          if (slot.payment && slot.payment.trim() && !isNaN(parseFloat(slot.payment))) {
+            return { slotIndex: idx, amount: parseFloat(slot.payment) }
+          }
+          return null
+        })
+        .filter((p) => p !== null) as Array<{ slotIndex: number; amount: number }>
+
+      // Also maintain backwards compatibility with required_instruments (flatten all instruments)
+      const allInstruments = validSlots.flatMap((slot) => slot.instruments)
+      const uniqueInstruments = Array.from(new Set(allInstruments)) as Instrument[]
+
       const { data, error } = await supabase
         .from('gigs')
         .insert({
@@ -125,15 +153,10 @@ export default function NewGigContent({ user }: { user: User }) {
           start_time: isoStartTime,
           end_time: isoEndTime,
           number_of_sets: numberOfSets ? parseInt(numberOfSets, 10) : null,
-          required_instruments: requiredInstruments,
-          invite_only_instruments: inviteOnlyInstruments,
-          payment_per_instrument: Object.keys(paymentPerInstrument).reduce((acc, instrument) => {
-            const payment = paymentPerInstrument[instrument as Instrument]
-            if (payment && payment.trim() && !isNaN(parseFloat(payment))) {
-              acc[instrument] = parseFloat(payment)
-            }
-            return acc
-          }, {} as Record<string, number>),
+          required_instruments: uniqueInstruments, // Backwards compatibility
+          instrument_slots: instrumentSlots,
+          invite_only_slots: inviteOnlySlots,
+          payment_per_slot: paymentPerSlot,
         })
         .select()
         .single()
@@ -316,72 +339,102 @@ export default function NewGigContent({ user }: { user: User }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Required Instruments * (select all that apply)
-                </label>
+                <div className="mb-3 flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Musician Slots *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addSlot}
+                    className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    + Add Slot
+                  </button>
+                </div>
                 <p className="mb-3 text-xs text-gray-500">
-                  Check instruments needed. You can mark any as "Invite Only" to restrict who can apply.
+                  Each slot represents one musician position. You can require multiple instruments per slot (e.g., "Alto Sax AND Soprano Sax").
                 </p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {INSTRUMENTS.map((instrument) => {
-                    const isRequired = requiredInstruments.includes(instrument)
-                    const isInviteOnly = inviteOnlyInstruments.includes(instrument)
-                    
-                    return (
-                      <div
-                        key={instrument}
-                        className="rounded-md border border-gray-300 p-3 hover:bg-gray-50"
-                      >
+                <div className="space-y-4">
+                  {slots.map((slot, slotIndex) => (
+                    <div
+                      key={slotIndex}
+                      className="rounded-lg border border-gray-300 p-4 bg-gray-50"
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <h4 className="text-sm font-medium text-gray-700">
+                          Slot {slotIndex + 1}
+                        </h4>
+                        {slots.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeSlot(slotIndex)}
+                            className="text-xs text-red-600 hover:text-red-700"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="mb-3">
+                        <label className="block text-xs font-medium text-gray-600 mb-2">
+                          Required Instruments (select all for this slot):
+                        </label>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                          {INSTRUMENTS.map((instrument) => {
+                            const isSelected = slot.instruments.includes(instrument)
+                            return (
+                              <label
+                                key={instrument}
+                                className="flex items-center space-x-2 cursor-pointer rounded border border-gray-200 p-2 hover:bg-white"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleInstrumentInSlot(slotIndex, instrument)}
+                                  className="h-3 w-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-xs text-gray-700">{instrument}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                        {slot.instruments.length === 0 && (
+                          <p className="mt-1 text-xs text-red-600">
+                            Select at least one instrument for this slot
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-start gap-4">
                         <label className="flex items-center space-x-2 cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={isRequired}
-                            onChange={() => handleToggleInstrument(instrument)}
-                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            checked={slot.inviteOnly}
+                            onChange={() => toggleInviteOnly(slotIndex)}
+                            className="h-3 w-3 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                           />
-                          <span className="text-sm text-gray-700 flex-1">{instrument}</span>
+                          <span className="text-xs text-purple-600 font-medium">
+                            Invite Only
+                          </span>
                         </label>
-                        {isRequired && (
-                          <div className="mt-2 space-y-2">
-                            <label className="flex items-center space-x-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={isInviteOnly}
-                                onChange={() => handleToggleInviteOnly(instrument)}
-                                className="h-3 w-3 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                              />
-                              <span className="text-xs text-purple-600 font-medium">
-                                Invite Only
-                              </span>
-                            </label>
-                            <div>
-                              <label className="text-xs text-gray-600">Payment ($):</label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={paymentPerInstrument[instrument] || ''}
-                                onChange={(e) => handlePaymentChange(instrument, e.target.value)}
-                                placeholder="Optional"
-                                className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                              />
-                            </div>
-                          </div>
-                        )}
+                        <div className="flex-1 max-w-xs">
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Payment ($):
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={slot.payment}
+                            onChange={(e) => setPaymentForSlot(slotIndex, e.target.value)}
+                            placeholder="Optional"
+                            className="block w-full rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                          />
+                        </div>
                       </div>
-                    )
-                  })}
+                    </div>
+                  ))}
                 </div>
-                {requiredInstruments.length === 0 && (
-                  <p className="mt-2 text-sm text-red-600">
-                    Please select at least one instrument
-                  </p>
-                )}
-                {inviteOnlyInstruments.length > 0 && (
-                  <p className="mt-2 text-sm text-purple-600">
-                    {inviteOnlyInstruments.length} instrument(s) marked as invite-only. You'll be able to select which musicians to invite after creating the gig.
-                  </p>
-                )}
               </div>
 
               <div className="flex justify-end space-x-3">
