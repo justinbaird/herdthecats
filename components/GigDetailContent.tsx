@@ -212,6 +212,7 @@ export default function GigDetailContent({
         .eq('status', 'pending')
 
       // Send calendar invitation email to the accepted musician
+      let emailSent = false
       try {
         const emailResponse = await fetch('/api/gigs/send-calendar-invite', {
           method: 'POST',
@@ -221,16 +222,21 @@ export default function GigDetailContent({
           body: JSON.stringify({ applicationId }),
         })
 
-        if (!emailResponse.ok) {
+        if (emailResponse.ok) {
+          const emailResult = await emailResponse.json()
+          emailSent = emailResult.success === true
+        } else {
           console.error('Failed to send calendar invite email:', await emailResponse.text())
-          // Don't fail the acceptance if email fails
         }
       } catch (emailError) {
         console.error('Error sending calendar invite email:', emailError)
         // Don't fail the acceptance if email fails
       }
 
-      setSuccess('Application accepted! Calendar invitation email sent.')
+      setSuccess(emailSent 
+        ? 'Application accepted! Calendar invitation email sent.'
+        : 'Application accepted! (Email service not configured - calendar links available on the gig page)'
+      )
       await loadGig()
       setTimeout(() => setSuccess(null), 5000)
     } catch (error: any) {
