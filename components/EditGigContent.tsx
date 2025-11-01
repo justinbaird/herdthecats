@@ -81,14 +81,43 @@ export default function EditGigContent({
       return
     }
 
+    if (!datetime) {
+      setError('Please select a date and time')
+      setSaving(false)
+      return
+    }
+
     try {
+      // Convert datetime-local value to ISO string with timezone
+      // datetime-local format: "YYYY-MM-DDTHH:mm" (local time, no timezone)
+      // Parse as local time and convert to ISO string (UTC) for PostgreSQL
+      if (!datetime || datetime.trim() === '') {
+        setError('Please select a date and time')
+        setSaving(false)
+        return
+      }
+      
+      // Create a date object treating the input as local time
+      // The datetime-local input provides local time without timezone
+      const dateObj = new Date(datetime)
+      
+      // Validate the date is valid
+      if (isNaN(dateObj.getTime())) {
+        setError('Invalid date and time')
+        setSaving(false)
+        return
+      }
+      
+      // Convert to ISO string (UTC) for database storage
+      const isoDatetime = dateObj.toISOString()
+
       const { error: updateError } = await supabase
         .from('gigs')
         .update({
           title,
           description: description || null,
           location,
-          datetime,
+          datetime: isoDatetime,
           required_instruments: requiredInstruments,
         })
         .eq('id', gigId)

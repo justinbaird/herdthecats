@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { INSTRUMENTS, type Instrument } from '@/lib/supabase/types'
+import { TIMEZONE_OPTIONS } from '@/lib/timezones'
 import Navigation from './Navigation'
 
 export default function ProfileContent({ user }: { user: User }) {
@@ -13,6 +14,8 @@ export default function ProfileContent({ user }: { user: User }) {
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [city, setCity] = useState('')
+  const [timezone, setTimezone] = useState('')
   const [instruments, setInstruments] = useState<Instrument[]>([])
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -36,11 +39,15 @@ export default function ProfileContent({ user }: { user: User }) {
       if (data) {
         setName(data.name || '')
         setEmail(data.email || user.email || '')
+        setCity(data.city || '')
+        setTimezone(data.timezone || '')
         setInstruments(data.instruments || [])
       } else {
         // No profile exists yet, use defaults
         setName('')
         setEmail(user.email || '')
+        setCity('')
+        setTimezone('')
         setInstruments([])
       }
     } catch (error: any) {
@@ -72,6 +79,8 @@ export default function ProfileContent({ user }: { user: User }) {
           user_id: user.id,
           name: name || 'User',
           email: email || user.email || '',
+          city: city || null,
+          timezone: timezone || null,
           instruments,
         }, {
           onConflict: 'user_id'
@@ -82,6 +91,8 @@ export default function ProfileContent({ user }: { user: User }) {
       }
 
       setSuccess(true)
+      // Reload profile to ensure Navigation gets updated
+      await loadProfile()
       setTimeout(() => setSuccess(false), 3000)
     } catch (error: any) {
       console.error('Error saving profile:', error)
@@ -160,6 +171,41 @@ export default function ProfileContent({ user }: { user: User }) {
                   required
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="city-timezone"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  City & Timezone
+                </label>
+                <select
+                  id="city-timezone"
+                  value={timezone ? `${city}|${timezone}` : ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value) {
+                      const [selectedCity, selectedTimezone] = value.split('|')
+                      setCity(selectedCity)
+                      setTimezone(selectedTimezone)
+                    } else {
+                      setCity('')
+                      setTimezone('')
+                    }
+                  }}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                >
+                  <option value="">Select your city...</option>
+                  {TIMEZONE_OPTIONS.map((option) => (
+                    <option key={option.timezone} value={`${option.city}|${option.timezone}`}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Select your city to set your timezone for gig scheduling
+                </p>
               </div>
 
               <div>

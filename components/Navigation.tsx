@@ -5,16 +5,35 @@ import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import type { User } from '@supabase/supabase-js'
+import { formatTimezoneDisplay, getTimezoneCode } from '@/lib/timezones'
 
 export default function Navigation({ user }: { user: User }) {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
   const [isAdmin, setIsAdmin] = useState(false)
+  const [musicianProfile, setMusicianProfile] = useState<any>(null)
 
   useEffect(() => {
     checkAdmin()
+    loadProfile()
   }, [])
+
+  const loadProfile = async () => {
+    try {
+      const { data } = await supabase
+        .from('musicians')
+        .select('city, timezone')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      
+      if (data) {
+        setMusicianProfile(data)
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error)
+    }
+  }
 
   const checkAdmin = async () => {
     const { data: userData } = await supabase.auth.getUser()
@@ -98,7 +117,14 @@ export default function Navigation({ user }: { user: User }) {
             </div>
           </div>
           <div className="flex items-center">
-            <span className="mr-4 text-sm text-gray-700">{user.email}</span>
+            <div className="mr-4 text-right">
+              <div className="text-sm text-gray-700">{user.email}</div>
+              {musicianProfile?.city && musicianProfile?.timezone && (
+                <div className="text-xs text-gray-500">
+                  {formatTimezoneDisplay(musicianProfile.city, musicianProfile.timezone)}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleLogout}
               className="rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
