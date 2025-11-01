@@ -273,17 +273,27 @@ export default function GigDetailContent({
           <div className="rounded-lg bg-white p-6 shadow">
             <div className="mb-4 flex items-center justify-between">
               <h1 className="text-3xl font-bold text-gray-900">{gig.title}</h1>
-              <span
-                className={`rounded-full px-3 py-1 text-sm font-medium ${
-                  gig.status === 'open'
-                    ? 'bg-green-100 text-green-800'
-                    : gig.status === 'filled'
-                    ? 'bg-gray-100 text-gray-800'
-                    : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {gig.status}
-              </span>
+              <div className="flex items-center gap-3">
+                {isGigPoster && (
+                  <Link
+                    href={`/gigs/${gigId}/edit`}
+                    className="rounded-md border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-700 shadow-sm hover:bg-indigo-50"
+                  >
+                    Edit Gig
+                  </Link>
+                )}
+                <span
+                  className={`rounded-full px-3 py-1 text-sm font-medium ${
+                    gig.status === 'open'
+                      ? 'bg-green-100 text-green-800'
+                      : gig.status === 'filled'
+                      ? 'bg-gray-100 text-gray-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {gig.status}
+                </span>
+              </div>
             </div>
 
             {gig.description && (

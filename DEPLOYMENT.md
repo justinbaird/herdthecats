@@ -43,16 +43,16 @@ In Netlify Dashboard → Site settings → Environment variables, add:
 2. Add each variable (Netlify will encrypt them automatically):
 
    **Variable 1:**
-   - Key: `NEXT_PUBLIC_SUPABASE_URL`
-   - Value: `https://onawdmmargogryrfmqgu.supabase.co`
+   - Key field: `NEXT_PUBLIC_SUPABASE_URL` (no = sign)
+   - Value field: `https://onawdmmargogryrfmqgu.supabase.co` (no = sign, no quotes)
    
    **Variable 2:**
-   - Key: `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - Value: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYXdkbW1hcmdvZ3J5cmZtcWd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NzM0MTEsImV4cCI6MjA3NzU0OTQxMX0.YzrwETJMboBmMsbuzI7DGYCajXaD2PNbNwgycEPPU4c`
+   - Key field: `NEXT_PUBLIC_SUPABASE_ANON_KEY` (no = sign)
+   - Value field: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYXdkbW1hcmdvZ3J5cmZtcWd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NzM0MTEsImV4cCI6MjA3NzU0OTQxMX0.YzrwETJMboBmMsbuzI7DGYCajXaD2PNbNwgycEPPU4c` (no = sign, no quotes)
    
    **Variable 3 (SECRET):**
-   - Key: `SUPABASE_SERVICE_ROLE_KEY`
-   - Value: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYXdkbW1hcmdvZ3J5cmZtcWd1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTk3MzQxMSwiZXhwIjoyMDc3NTQ5NDExfQ.2i8yxbB1lYeLY0HWlONZ8wv6vpW-DKkpN9Wb-MW6s5U`
+   - Key field: `SUPABASE_SERVICE_ROLE_KEY` (no = sign)
+   - Value field: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYXdkbW1hcmdvZ3J5cmZtcWd1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTk3MzQxMSwiZXhwIjoyMDc3NTQ5NDExfQ.2i8yxbB1lYeLY0HWlONZ8wv6vpW-DKkpN9Wb-MW6s5U` (no = sign, no quotes)
    - ⚠️ This key has admin privileges - keep it secret!
 
 3. Click "Save" after adding each variable
