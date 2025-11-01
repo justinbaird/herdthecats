@@ -27,7 +27,7 @@ export default function GigDetailContent({
   const [claiming, setClaiming] = useState<string | null>(null)
   const [invitations, setInvitations] = useState<any[]>([])
   const [managingInvitesFor, setManagingInvitesFor] = useState<string | null>(null)
-  const [inviteSearchEmail, setInviteSearchEmail] = useState('')
+  const [inviteSearchName, setInviteSearchName] = useState('')
   const [inviteSearchResults, setInviteSearchResults] = useState<any[]>([])
   const [inviting, setInviting] = useState(false)
 
@@ -311,21 +311,33 @@ export default function GigDetailContent({
     }
   }
 
-  const searchMusiciansForInvite = async (email: string) => {
-    if (!email.trim()) {
+  const searchMusiciansForInvite = async (nameQuery: string) => {
+    if (!nameQuery.trim()) {
       setInviteSearchResults([])
       return
     }
 
     try {
+      // Split search query into parts (handles first name, last name, or both)
+      const nameParts = nameQuery.trim().toLowerCase().split(/\s+/)
+      
+      // Search for musicians whose name contains any of the search terms
+      // This allows searching by first name, last name, or full name
       const { data, error } = await supabase
         .from('musicians')
         .select('*')
-        .ilike('email', `%${email}%`)
-        .limit(10)
+        .limit(20)
 
       if (error) throw error
-      setInviteSearchResults(data || [])
+
+      // Filter results client-side to match any part of the name
+      const filtered = (data || []).filter((musician) => {
+        const fullName = (musician.name || '').toLowerCase()
+        // Check if all search parts match the name
+        return nameParts.every(part => fullName.includes(part))
+      })
+
+      setInviteSearchResults(filtered.slice(0, 10))
     } catch (error: any) {
       console.error('Error searching musicians:', error)
       setInviteSearchResults([])
@@ -351,7 +363,7 @@ export default function GigDetailContent({
       if (error) throw error
 
       setSuccess('Invitation sent!')
-      setInviteSearchEmail('')
+      setInviteSearchName('')
       setInviteSearchResults([])
       await loadGig()
       setTimeout(() => setSuccess(null), 3000)
@@ -618,7 +630,7 @@ export default function GigDetailContent({
                               onClick={() => {
                                 if (managingInvitesFor === instrument) {
                                   setManagingInvitesFor(null)
-                                  setInviteSearchEmail('')
+                                  setInviteSearchName('')
                                   setInviteSearchResults([])
                                 } else {
                                   setManagingInvitesFor(instrument)
@@ -655,14 +667,14 @@ export default function GigDetailContent({
                             <div>
                               <div className="flex gap-2 mb-2">
                                 <input
-                                  type="email"
-                                  value={inviteSearchEmail}
+                                  type="text"
+                                  value={inviteSearchName}
                                   onChange={(e) => {
-                                    setInviteSearchEmail(e.target.value)
+                                    setInviteSearchName(e.target.value)
                                     searchMusiciansForInvite(e.target.value)
                                   }}
-                                  placeholder="Search by email..."
-                                  className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs text-gray-900"
+                                  placeholder="Search by name (first, last, or both)..."
+                                  className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs text-gray-900 placeholder-gray-400"
                                 />
                               </div>
 
@@ -697,11 +709,11 @@ export default function GigDetailContent({
                                 </div>
                               )}
 
-                              {inviteSearchEmail &&
+                              {inviteSearchName &&
                                 inviteSearchResults.length === 0 &&
                                 !inviting && (
                                   <p className="text-xs text-gray-500">
-                                    No musicians found matching that email.
+                                    No musicians found matching that name.
                                   </p>
                                 )}
                             </div>
