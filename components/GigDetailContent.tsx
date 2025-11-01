@@ -147,28 +147,27 @@ export default function GigDetailContent({
 
       if (appError) throw appError
 
-      // Check if this is the first application for this instrument
-      // If so, auto-accept (first come, first served)
-      const { data: allApps } = await supabase
-        .from('gig_applications')
-        .select('*')
-        .eq('gig_id', gigId)
-        .eq('instrument', instrument)
-        .order('created_at', { ascending: true })
-
-      if (allApps && allApps.length === 1) {
-        // First application, auto-accept
-        await supabase
-          .from('gig_applications')
-          .update({ status: 'accepted' })
-          .eq('id', allApps[0].id)
-
-        setSuccess(`Congratulations! You got the ${instrument} slot!`)
-      } else {
-        setSuccess(
-          `Application submitted for ${instrument}. You'll be notified if selected.`
-        )
+      // Notify gig poster about the new application
+      try {
+        await fetch('/api/gigs/application-notify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            gigId,
+            musicianId: user.id,
+            instrument,
+          }),
+        })
+      } catch (notifyError) {
+        // Don't fail the application if notification fails
+        console.error('Failed to send notification:', notifyError)
       }
+
+      setSuccess(
+        `Application submitted for ${instrument}. The gig poster will review and notify you if selected.`
+      )
 
       // Reload data
       await loadGig()
@@ -188,6 +187,13 @@ export default function GigDetailContent({
     }
 
     try {
+      const app = applications.find((a) => a.id === applicationId)
+      if (!app) {
+        setError('Application not found')
+        return
+      }
+
+      // Accept this application
       const { error } = await supabase
         .from('gig_applications')
         .update({ status: 'accepted' })
@@ -196,22 +202,42 @@ export default function GigDetailContent({
       if (error) throw error
 
       // Reject other applications for the same instrument
-      const app = applications.find((a) => a.id === applicationId)
-      if (app) {
-        await supabase
-          .from('gig_applications')
-          .update({ status: 'rejected' })
-          .eq('gig_id', gigId)
-          .eq('instrument', app.instrument)
-          .neq('id', applicationId)
-          .eq('status', 'pending')
-      }
+      await supabase
+        .from('gig_applications')
+        .update({ status: 'rejected' })
+        .eq('gig_id', gigId)
+        .eq('instrument', app.instrument)
+        .neq('id', applicationId)
+        .eq('status', 'pending')
 
       setSuccess('Application accepted!')
       await loadGig()
       setTimeout(() => setSuccess(null), 3000)
     } catch (error: any) {
       console.error('Error accepting application:', error)
+      setError(error.message)
+    }
+  }
+
+  const handleRejectApplication = async (applicationId: string) => {
+    if (gig.posted_by !== user.id) {
+      setError('Only the gig poster can reject applications')
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('gig_applications')
+        .update({ status: 'rejected' })
+        .eq('id', applicationId)
+
+      if (error) throw error
+
+      setSuccess('Application rejected')
+      await loadGig()
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (error: any) {
+      console.error('Error rejecting application:', error)
       setError(error.message)
     }
   }
@@ -320,9 +346,29 @@ export default function GigDetailContent({
               </h2>
               <div className="space-y-4">
                 {gig.required_instruments.map((instrument: string) => {
-                  const instrumentApps = appsByInstrument[instrument] || []
+                  // Sort applications: pending first (by time), then accepted, then rejected
+                  const instrumentAppsUnsorted = appsByInstrument[instrument] || []
+                  const instrumentApps = [...instrumentAppsUnsorted].sort((a, b) => {
+                    // Pending applications first, sorted by created_at (oldest first)
+                    if (a.status === 'pending' && b.status !== 'pending') return -1
+                    if (a.status !== 'pending' && b.status === 'pending') return 1
+                    if (a.status === 'pending' && b.status === 'pending') {
+                      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                    }
+                    // Accepted next
+                    if (a.status === 'accepted' && b.status !== 'accepted') return -1
+                    if (a.status !== 'accepted' && b.status === 'accepted') return 1
+                    // Rejected last
+                    if (a.status === 'rejected' && b.status !== 'rejected') return 1
+                    if (a.status !== 'rejected' && b.status === 'rejected') return -1
+                    // Same status, sort by created_at
+                    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                  })
                   const acceptedApp = instrumentApps.find(
                     (app) => app.status === 'accepted'
+                  )
+                  const pendingApps = instrumentApps.filter(
+                    (app) => app.status === 'pending'
                   )
                   const canClaim =
                     gig.status === 'open' &&
@@ -362,50 +408,98 @@ export default function GigDetailContent({
                         </button>
                       )}
 
-                      {isGigPoster && instrumentApps.length > 0 && (
-                        <div className="mt-3 space-y-2">
-                          <p className="text-sm font-medium text-gray-700">
-                            Applications:
-                          </p>
-                          {instrumentApps.map((app) => (
-                            <div
-                              key={app.id}
-                              className="flex items-center justify-between rounded-md bg-gray-50 p-2"
-                            >
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {app.musician?.name || 'Unknown'}
-                                </p>
-                                <p className="text-xs text-gray-600">
-                                  {app.musician?.email || 'No email'}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  Applied: {format(new Date(app.created_at), 'PPpp')}
-                                </p>
-                              </div>
-                              <div className="flex gap-2">
-                                <span
-                                  className={`rounded-full px-2 py-1 text-xs font-medium ${
-                                    app.status === 'accepted'
-                                      ? 'bg-green-100 text-green-800'
-                                      : app.status === 'rejected'
-                                      ? 'bg-red-100 text-red-800'
-                                      : 'bg-yellow-100 text-yellow-800'
-                                  }`}
-                                >
-                                  {app.status}
-                                </span>
-                                {app.status === 'pending' && !acceptedApp && (
-                                  <button
-                                    onClick={() => handleAcceptApplication(app.id)}
-                                    className="rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700"
+                      {isGigPoster && (
+                        <div className="mt-3">
+                          {pendingApps.length > 0 && (
+                            <div className="mb-3">
+                              <p className="mb-2 text-sm font-semibold text-gray-900">
+                                Pending Applications ({pendingApps.length}):
+                              </p>
+                              <div className="space-y-2">
+                                {pendingApps.map((app) => (
+                                  <div
+                                    key={app.id}
+                                    className="flex items-center justify-between rounded-md border border-yellow-200 bg-yellow-50 p-3"
                                   >
-                                    Accept
-                                  </button>
-                                )}
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium text-gray-900">
+                                        {app.musician?.name || 'Unknown'}
+                                      </p>
+                                      <p className="text-xs text-gray-600">
+                                        {app.musician?.email || 'No email'}
+                                      </p>
+                                      <p className="mt-1 text-xs text-gray-500">
+                                        Applied: {format(new Date(app.created_at), 'PPp')}
+                                      </p>
+                                    </div>
+                                    <div className="ml-4 flex gap-2">
+                                      <button
+                                        onClick={() => handleAcceptApplication(app.id)}
+                                        className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+                                      >
+                                        Accept
+                                      </button>
+                                      <button
+                                        onClick={() => handleRejectApplication(app.id)}
+                                        className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                                      >
+                                        Reject
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
-                          ))}
+                          )}
+
+                          {instrumentApps.filter((app) => app.status !== 'pending').length > 0 && (
+                            <div>
+                              <p className="mb-2 text-sm font-semibold text-gray-900">
+                                Application History:
+                              </p>
+                              <div className="space-y-2">
+                                {instrumentApps
+                                  .filter((app) => app.status !== 'pending')
+                                  .map((app) => (
+                                    <div
+                                      key={app.id}
+                                      className={`flex items-center justify-between rounded-md p-3 ${
+                                        app.status === 'accepted'
+                                          ? 'bg-green-50 border border-green-200'
+                                          : 'bg-gray-50 border border-gray-200'
+                                      }`}
+                                    >
+                                      <div>
+                                        <p className="text-sm font-medium text-gray-900">
+                                          {app.musician?.name || 'Unknown'}
+                                        </p>
+                                        <p className="text-xs text-gray-600">
+                                          {app.musician?.email || 'No email'}
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                          Applied: {format(new Date(app.created_at), 'PPp')}
+                                        </p>
+                                      </div>
+                                      <span
+                                        className={`ml-4 rounded-full px-3 py-1 text-xs font-medium ${
+                                          app.status === 'accepted'
+                                            ? 'bg-green-100 text-green-800'
+                                            : 'bg-gray-100 text-gray-800'
+                                        }`}
+                                      >
+                                        {app.status}
+                                      </span>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {instrumentApps.length === 0 && (
+                            <p className="mt-2 text-sm text-gray-500">
+                              No applications yet for this instrument.
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
