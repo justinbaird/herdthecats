@@ -31,9 +31,26 @@ export default function SignupPage() {
 
     const supabase = createClient()
 
+    // Get the base URL for email confirmation redirect
+    // In production, this should be your Netlify URL or custom domain
+    // In development, this will be localhost:3000
+    const getRedirectUrl = () => {
+      if (typeof window !== 'undefined') {
+        // Client-side: use current origin
+        return `${window.location.origin}/auth/confirm`
+      }
+      // Server-side fallback (shouldn't happen in this client component)
+      return process.env.NEXT_PUBLIC_SITE_URL 
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`
+        : 'http://localhost:3000/auth/confirm'
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: getRedirectUrl(),
+      },
     })
 
     if (error) {
