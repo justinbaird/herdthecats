@@ -21,7 +21,7 @@ export default function NetworkContent({ user }: { user: User }) {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [networkMembers, setNetworkMembers] = useState<NetworkMember[]>([])
-  const [searchEmail, setSearchEmail] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -72,29 +72,58 @@ export default function NetworkContent({ user }: { user: User }) {
   }
 
   const searchMusicians = async () => {
-    if (!searchEmail.trim()) return
+    if (!searchQuery.trim()) return
 
     setSearching(true)
     setError(null)
     setSearchResults([])
 
     try {
-      const { data, error } = await supabase
-        .from('musicians')
-        .select('id, name, email, instruments, user_id')
-        .ilike('email', `%${searchEmail}%`)
-        .neq('user_id', user.id)
-        .limit(10)
+      const query = searchQuery.trim().toLowerCase()
+      const isEmailQuery = query.includes('@')
+      
+      let data: any[] = []
+      
+      if (isEmailQuery) {
+        // If it looks like an email, search by email
+        const { data: emailData, error: emailError } = await supabase
+          .from('musicians')
+          .select('id, name, email, instruments, user_id')
+          .ilike('email', `%${query}%`)
+          .neq('user_id', user.id)
+          .limit(20)
 
-      if (error) throw error
+        if (emailError) throw emailError
+        data = emailData || []
+      } else {
+        // Otherwise, search by name
+        // Split search query into parts (handles first name, last name, or both)
+        const nameParts = query.split(/\s+/)
+        
+        // Get all musicians (we'll filter client-side for name matching)
+        const { data: allMusicians, error: allError } = await supabase
+          .from('musicians')
+          .select('id, name, email, instruments, user_id')
+          .neq('user_id', user.id)
+          .limit(50)
+
+        if (allError) throw allError
+
+        // Filter results client-side to match name parts
+        data = (allMusicians || []).filter((musician) => {
+          const fullName = (musician.name || '').toLowerCase()
+          // Check if all search parts match the name
+          return nameParts.every(part => fullName.includes(part))
+        })
+      }
 
       // Filter out musicians already in network
       const networkUserIds = networkMembers.map((m) => m.network_member_id)
-      const filtered = (data || []).filter(
+      const filtered = data.filter(
         (m) => !networkUserIds.includes(m.user_id)
       )
 
-      setSearchResults(filtered)
+      setSearchResults(filtered.slice(0, 10))
     } catch (error: any) {
       console.error('Error searching:', error)
       setError(error.message)
@@ -113,7 +142,7 @@ export default function NetworkContent({ user }: { user: User }) {
       if (error) throw error
 
       setSuccess('Musician added to network!')
-      setSearchEmail('')
+      setSearchQuery('')
       setSearchResults([])
       await loadNetwork()
       setTimeout(() => setSuccess(null), 3000)
@@ -187,16 +216,16 @@ export default function NetworkContent({ user }: { user: User }) {
             </h3>
             <div className="flex gap-2">
               <input
-                type="email"
-                value={searchEmail}
-                onChange={(e) => setSearchEmail(e.target.value)}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && searchMusicians()}
-                placeholder="Search by email address..."
+                placeholder="Search by name (first, last, or both) or email..."
                 className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
               />
               <button
                 onClick={searchMusicians}
-                disabled={searching}
+                disabled={searching || !searchQuery.trim()}
                 className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
               >
                 {searching ? 'Searching...' : 'Search'}

@@ -74,11 +74,15 @@ export async function POST(request: Request) {
     }
 
     // Generate calendar invitation (.ics content)
+    const startTime = new Date(gig.start_time || gig.datetime)
+    const endTime = gig.end_time ? new Date(gig.end_time) : undefined
+    
     const calendarContent = generateICalContent({
       title: `${gig.title} - ${application.instrument}`,
       description: gig.description || `Playing ${application.instrument} at ${gig.title}`,
       location: gig.location,
-      startTime: new Date(gig.datetime),
+      startTime,
+      endTime,
     })
 
     // Get gig poster's name for the email
@@ -121,8 +125,11 @@ export async function POST(request: Request) {
       <div class="gig-details">
         <p><strong>Gig:</strong> ${gig.title}</p>
         <p><strong>Instrument:</strong> ${application.instrument}</p>
-        <p><strong>Date & Time:</strong> ${new Date(gig.datetime).toLocaleString()}</p>
+        ${gig.call_time ? `<p><strong>Call Time:</strong> ${new Date(gig.call_time).toLocaleString()}</p>` : ''}
+        <p><strong>Start Time:</strong> ${startTime.toLocaleString()}</p>
+        ${endTime ? `<p><strong>End Time:</strong> ${endTime.toLocaleString()}</p>` : ''}
         <p><strong>Location:</strong> ${gig.location}</p>
+        ${gig.number_of_sets ? `<p><strong>Sets:</strong> ${gig.number_of_sets}</p>` : ''}
         ${gig.description ? `<p><strong>Description:</strong> ${gig.description}</p>` : ''}
       </div>
       

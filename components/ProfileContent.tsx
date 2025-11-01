@@ -6,6 +6,7 @@ import type { User } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { INSTRUMENTS, type Instrument } from '@/lib/supabase/types'
 import { TIMEZONE_OPTIONS } from '@/lib/timezones'
+import { COUNTRY_CODES } from '@/lib/country-codes'
 import Navigation from './Navigation'
 
 export default function ProfileContent({ user }: { user: User }) {
@@ -16,6 +17,8 @@ export default function ProfileContent({ user }: { user: User }) {
   const [email, setEmail] = useState('')
   const [city, setCity] = useState('')
   const [timezone, setTimezone] = useState('')
+  const [countryCode, setCountryCode] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
   const [instruments, setInstruments] = useState<Instrument[]>([])
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -41,6 +44,8 @@ export default function ProfileContent({ user }: { user: User }) {
         setEmail(data.email || user.email || '')
         setCity(data.city || '')
         setTimezone(data.timezone || '')
+        setCountryCode(data.country_code || '')
+        setPhoneNumber(data.phone_number || '')
         setInstruments(data.instruments || [])
       } else {
         // No profile exists yet, use defaults
@@ -48,6 +53,8 @@ export default function ProfileContent({ user }: { user: User }) {
         setEmail(user.email || '')
         setCity('')
         setTimezone('')
+        setCountryCode('')
+        setPhoneNumber('')
         setInstruments([])
       }
     } catch (error: any) {
@@ -81,6 +88,8 @@ export default function ProfileContent({ user }: { user: User }) {
           email: email || user.email || '',
           city: city || null,
           timezone: timezone || null,
+          country_code: countryCode || null,
+          phone_number: phoneNumber || null,
           instruments,
         }, {
           onConflict: 'user_id'
@@ -205,6 +214,41 @@ export default function ProfileContent({ user }: { user: User }) {
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
                   Select your city to set your timezone for gig scheduling
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="phone-number"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Phone Number
+                </label>
+                <div className="mt-1 flex gap-2">
+                  <select
+                    id="country-code"
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="w-32 rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  >
+                    <option value="">Code</option>
+                    {COUNTRY_CODES.map((cc) => (
+                      <option key={cc.code} value={cc.code}>
+                        {cc.flag} {cc.code}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="tel"
+                    id="phone-number"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="Phone number"
+                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Optional: Your phone number for gig coordination
                 </p>
               </div>
 

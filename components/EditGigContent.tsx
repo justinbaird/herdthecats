@@ -24,8 +24,13 @@ export default function EditGigContent({
   const [description, setDescription] = useState('')
   const [location, setLocation] = useState('')
   const [datetime, setDatetime] = useState('')
+  const [callTime, setCallTime] = useState('')
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
+  const [numberOfSets, setNumberOfSets] = useState('')
   const [requiredInstruments, setRequiredInstruments] = useState<Instrument[]>([])
   const [inviteOnlyInstruments, setInviteOnlyInstruments] = useState<Instrument[]>([])
+  const [paymentPerInstrument, setPaymentPerInstrument] = useState<Record<Instrument, string>>({} as Record<Instrument, string>)
 
   useEffect(() => {
     loadGig()
@@ -47,14 +52,53 @@ export default function EditGigContent({
       setTitle(gigData.title)
       setDescription(gigData.description || '')
       setLocation(gigData.location)
+      
       // Convert datetime to format compatible with datetime-local input
       const date = new Date(gigData.datetime)
       const localDatetime = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
         .toISOString()
         .slice(0, 16)
       setDatetime(localDatetime)
+      
+      // Convert timing fields if they exist
+      if (gigData.start_time) {
+        const startDate = new Date(gigData.start_time)
+        const localStartTime = new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 16)
+        setStartTime(localStartTime)
+      }
+      
+      if (gigData.call_time) {
+        const callDate = new Date(gigData.call_time)
+        const localCallTime = new Date(callDate.getTime() - callDate.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 16)
+        setCallTime(localCallTime)
+      }
+      
+      if (gigData.end_time) {
+        const endDate = new Date(gigData.end_time)
+        const localEndTime = new Date(endDate.getTime() - endDate.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 16)
+        setEndTime(localEndTime)
+      }
+      
+      setNumberOfSets(gigData.number_of_sets ? gigData.number_of_sets.toString() : '')
       setRequiredInstruments(gigData.required_instruments || [])
       setInviteOnlyInstruments(gigData.invite_only_instruments || [])
+      
+      // Load payment per instrument
+      const payments: Record<Instrument, string> = {} as Record<Instrument, string>
+      if (gigData.payment_per_instrument) {
+        Object.entries(gigData.payment_per_instrument).forEach(([instrument, amount]) => {
+          if (typeof amount === 'number') {
+            payments[instrument as Instrument] = amount.toString()
+          }
+        })
+      }
+      setPaymentPerInstrument(payments)
     } catch (error: any) {
       console.error('Error loading gig:', error)
       setError(error.message)
@@ -65,15 +109,28 @@ export default function EditGigContent({
   }
 
   const handleToggleInstrument = (instrument: Instrument) => {
+    const wasRequired = requiredInstruments.includes(instrument)
     setRequiredInstruments((prev) =>
       prev.includes(instrument)
         ? prev.filter((i) => i !== instrument)
         : [...prev, instrument]
     )
-    // Remove from invite-only if removing from required
-    if (!requiredInstruments.includes(instrument)) {
+    // Remove from invite-only and payment if removing from required
+    if (wasRequired) {
       setInviteOnlyInstruments((prev) => prev.filter((i) => i !== instrument))
+      setPaymentPerInstrument((prev) => {
+        const updated = { ...prev }
+        delete updated[instrument]
+        return updated
+      })
     }
+  }
+
+  const handlePaymentChange = (instrument: Instrument, value: string) => {
+    setPaymentPerInstrument((prev) => ({
+      ...prev,
+      [instrument]: value,
+    }))
   }
 
   const handleToggleInviteOnly = (instrument: Instrument) => {
@@ -97,35 +154,47 @@ export default function EditGigContent({
       return
     }
 
-    if (!datetime) {
-      setError('Please select a date and time')
+    // Validate at least start_time is provided (or datetime for backwards compatibility)
+    if (!startTime && !datetime) {
+      setError('Please select a start time')
       setSaving(false)
       return
     }
 
     try {
-      // Convert datetime-local value to ISO string with timezone
-      // datetime-local format: "YYYY-MM-DDTHH:mm" (local time, no timezone)
-      // Parse as local time and convert to ISO string (UTC) for PostgreSQL
-      if (!datetime || datetime.trim() === '') {
-        setError('Please select a date and time')
+      // Convert datetime-local values to ISO strings with timezone
+      // Use startTime if provided, otherwise fall back to datetime for backwards compatibility
+      const primaryDatetime = startTime || datetime
+      
+      // Create date objects treating inputs as local time
+      const startDateObj = startTime ? new Date(startTime) : new Date(datetime)
+      
+      if (isNaN(startDateObj.getTime())) {
+        setError('Invalid start time')
+        setSaving(false)
+        return
+      }
+
+      const isoDatetime = startDateObj.toISOString()
+      const isoStartTime = startTime ? startDateObj.toISOString() : null
+      
+      // Convert other time fields if provided
+      const isoCallTime = callTime ? new Date(callTime).toISOString() : null
+      const isoEndTime = endTime ? new Date(endTime).toISOString() : null
+      
+      // Validate call time is before start time if both provided
+      if (callTime && startTime && new Date(callTime) >= new Date(startTime)) {
+        setError('Call time must be before start time')
         setSaving(false)
         return
       }
       
-      // Create a date object treating the input as local time
-      // The datetime-local input provides local time without timezone
-      const dateObj = new Date(datetime)
-      
-      // Validate the date is valid
-      if (isNaN(dateObj.getTime())) {
-        setError('Invalid date and time')
+      // Validate start time is before end time if both provided
+      if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
+        setError('Start time must be before end time')
         setSaving(false)
         return
       }
-      
-      // Convert to ISO string (UTC) for database storage
-      const isoDatetime = dateObj.toISOString()
 
       const { error: updateError } = await supabase
         .from('gigs')
@@ -133,9 +202,20 @@ export default function EditGigContent({
           title,
           description: description || null,
           location,
-          datetime: isoDatetime,
+          datetime: isoDatetime, // Keep for backwards compatibility
+          call_time: isoCallTime,
+          start_time: isoStartTime,
+          end_time: isoEndTime,
+          number_of_sets: numberOfSets ? parseInt(numberOfSets, 10) : null,
           required_instruments: requiredInstruments,
           invite_only_instruments: inviteOnlyInstruments,
+          payment_per_instrument: Object.keys(paymentPerInstrument).reduce((acc, instrument) => {
+            const payment = paymentPerInstrument[instrument as Instrument]
+            if (payment && payment.trim() && !isNaN(parseFloat(payment))) {
+              acc[instrument] = parseFloat(payment)
+            }
+            return acc
+          }, {} as Record<string, number>),
         })
         .eq('id', gigId)
         .eq('posted_by', user.id)
@@ -234,19 +314,81 @@ export default function EditGigContent({
 
               <div>
                 <label
-                  htmlFor="datetime"
+                  htmlFor="start-time"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  Date & Time *
+                  Start Time *
                 </label>
                 <input
                   type="datetime-local"
-                  id="datetime"
-                  value={datetime}
-                  onChange={(e) => setDatetime(e.target.value)}
+                  id="start-time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
                   required
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  When the performance starts
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="call-time"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Call Time
+                </label>
+                <input
+                  type="datetime-local"
+                  id="call-time"
+                  value={callTime}
+                  onChange={(e) => setCallTime(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  When musicians should arrive (optional)
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="end-time"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  End Time
+                </label>
+                <input
+                  type="datetime-local"
+                  id="end-time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  When the performance ends (optional)
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="number-of-sets"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Number of Sets
+                </label>
+                <input
+                  type="number"
+                  id="number-of-sets"
+                  value={numberOfSets}
+                  onChange={(e) => setNumberOfSets(e.target.value)}
+                  min="1"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  placeholder="e.g., 2"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Optional: How many sets will be performed
+                </p>
               </div>
 
               <div>
@@ -276,17 +418,31 @@ export default function EditGigContent({
                           <span className="text-sm text-gray-700 flex-1">{instrument}</span>
                         </label>
                         {isRequired && (
-                          <label className="mt-2 flex items-center space-x-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={isInviteOnly}
-                              onChange={() => handleToggleInviteOnly(instrument)}
-                              className="h-3 w-3 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                            />
-                            <span className="text-xs text-purple-600 font-medium">
-                              Invite Only
-                            </span>
-                          </label>
+                          <div className="mt-2 space-y-2">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isInviteOnly}
+                                onChange={() => handleToggleInviteOnly(instrument)}
+                                className="h-3 w-3 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                              />
+                              <span className="text-xs text-purple-600 font-medium">
+                                Invite Only
+                              </span>
+                            </label>
+                            <div>
+                              <label className="text-xs text-gray-600">Payment ($):</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={paymentPerInstrument[instrument] || ''}
+                                onChange={(e) => handlePaymentChange(instrument, e.target.value)}
+                                placeholder="Optional"
+                                className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                              />
+                            </div>
+                          </div>
                         )}
                       </div>
                     )

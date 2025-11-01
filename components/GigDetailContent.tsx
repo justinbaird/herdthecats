@@ -484,12 +484,37 @@ export default function GigDetailContent({
 
             <div className="mb-4 space-y-2">
               <p className="text-sm text-gray-600">
-                <span className="font-medium">Date & Time:</span>{' '}
-                {format(new Date(gig.datetime), 'PPpp')}
-              </p>
-              <p className="text-sm text-gray-600">
                 <span className="font-medium">Location:</span> {gig.location}
               </p>
+              {gig.call_time && (
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Call Time:</span>{' '}
+                  {format(new Date(gig.call_time), 'PPpp')}
+                </p>
+              )}
+              {gig.start_time && (
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Start Time:</span>{' '}
+                  {format(new Date(gig.start_time), 'PPpp')}
+                </p>
+              )}
+              {!gig.start_time && gig.datetime && (
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Date & Time:</span>{' '}
+                  {format(new Date(gig.datetime), 'PPpp')}
+                </p>
+              )}
+              {gig.end_time && (
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">End Time:</span>{' '}
+                  {format(new Date(gig.end_time), 'PPpp')}
+                </p>
+              )}
+              {gig.number_of_sets && (
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Sets:</span> {gig.number_of_sets}
+                </p>
+              )}
               <p className="text-sm text-gray-600">
                 <span className="font-medium">Posted by:</span>{' '}
                 {gig.posted_by_musician?.name || 'Unknown'}
@@ -558,6 +583,16 @@ export default function GigDetailContent({
                               Invite Only
                             </span>
                           )}
+                          {/* Show payment only if musician can claim this instrument or has already applied/accepted */}
+                          {musician && 
+                           (myInstruments.includes(instrument) || 
+                            instrumentApps.some(app => app.musician_id === user.id)) &&
+                           gig.payment_per_instrument &&
+                           gig.payment_per_instrument[instrument] && (
+                            <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                              ${gig.payment_per_instrument[instrument]}
+                            </span>
+                          )}
                         </div>
                         {acceptedApp ? (
                           <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
@@ -580,7 +615,8 @@ export default function GigDetailContent({
                               title: `${gig.title} - ${instrument}`,
                               description: gig.description || `Playing ${instrument} at ${gig.title}`,
                               location: gig.location,
-                              startTime: new Date(gig.datetime),
+                              startTime: new Date(gig.start_time || gig.datetime),
+                              endTime: gig.end_time ? new Date(gig.end_time) : undefined,
                             })}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -594,7 +630,8 @@ export default function GigDetailContent({
                                 title: `${gig.title} - ${instrument}`,
                                 description: gig.description || `Playing ${instrument} at ${gig.title}`,
                                 location: gig.location,
-                                startTime: new Date(gig.datetime),
+                                startTime: new Date(gig.start_time || gig.datetime),
+                                endTime: gig.end_time ? new Date(gig.end_time) : undefined,
                               })
                             }}
                             className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
@@ -806,7 +843,8 @@ export default function GigDetailContent({
                                                   title: `${gig.title} - ${app.instrument}`,
                                                   description: gig.description || `Playing ${app.instrument} at ${gig.title}`,
                                                   location: gig.location,
-                                                  startTime: new Date(gig.datetime),
+                                                  startTime: new Date(gig.start_time || gig.datetime),
+                                                  endTime: gig.end_time ? new Date(gig.end_time) : undefined,
                                                 })}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
@@ -820,7 +858,8 @@ export default function GigDetailContent({
                                                     title: `${gig.title} - ${app.instrument}`,
                                                     description: gig.description || `Playing ${app.instrument} at ${gig.title}`,
                                                     location: gig.location,
-                                                    startTime: new Date(gig.datetime),
+                                                    startTime: new Date(gig.start_time || gig.datetime),
+                                                    endTime: gig.end_time ? new Date(gig.end_time) : undefined,
                                                   })
                                                 }}
                                                 className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
