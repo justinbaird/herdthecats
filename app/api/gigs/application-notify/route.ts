@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     // Get gig details
     const { data: gig, error: gigError } = await supabase
       .from('gigs')
-      .select('*, posted_by:auth.users!gigs_posted_by_fkey(email)')
+      .select('*')
       .eq('id', gigId)
       .single()
 
