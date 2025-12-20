@@ -67,7 +67,7 @@ export default function Navigation({ user }: { user: User }) {
                 className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
                   isActive('/dashboard')
                     ? 'border-indigo-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
                 }`}
               >
                 Dashboard
@@ -77,7 +77,7 @@ export default function Navigation({ user }: { user: User }) {
                 className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
                   isActive('/profile')
                     ? 'border-indigo-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
                 }`}
               >
                 Profile
@@ -87,7 +87,7 @@ export default function Navigation({ user }: { user: User }) {
                 className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
                   isActive('/network')
                     ? 'border-indigo-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
                 }`}
               >
                 Network
@@ -97,10 +97,20 @@ export default function Navigation({ user }: { user: User }) {
                 className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
                   isActive('/gigs')
                     ? 'border-indigo-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
                 }`}
               >
                 Gigs
+              </Link>
+              <Link
+                href="/venues"
+                className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
+                  isActive('/venues')
+                    ? 'border-indigo-500 text-gray-900'
+                    : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                Venues
               </Link>
               {isAdmin && (
                 <Link
@@ -108,7 +118,7 @@ export default function Navigation({ user }: { user: User }) {
                   className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
                     isActive('/admin')
                       ? 'border-indigo-500 text-gray-900'
-                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
                   }`}
                 >
                   Admin
@@ -120,7 +130,7 @@ export default function Navigation({ user }: { user: User }) {
             <div className="mr-4 text-right">
               <div className="text-sm text-gray-700">{user.email}</div>
               {musicianProfile?.city && musicianProfile?.timezone && (
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-900">
                   {formatTimezoneDisplay(musicianProfile.city, musicianProfile.timezone)}
                 </div>
               )}

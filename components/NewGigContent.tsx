@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { INSTRUMENTS, type Instrument } from '@/lib/supabase/types'
 import Navigation from './Navigation'
 
-export default function NewGigContent({ user }: { user: User }) {
+export default function NewGigContent({ user, initialVenueId, initialDate }: { user: User; initialVenueId?: string; initialDate?: string }) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -18,11 +18,36 @@ export default function NewGigContent({ user }: { user: User }) {
   const [location, setLocation] = useState('')
   const [datetime, setDatetime] = useState('')
   const [callTime, setCallTime] = useState('')
-  const [startTime, setStartTime] = useState('')
+  const [startTime, setStartTime] = useState(initialDate ? `${initialDate}T12:00` : '')
   const [endTime, setEndTime] = useState('')
   const [numberOfSets, setNumberOfSets] = useState('')
+  const [venueId, setVenueId] = useState<string | null>(initialVenueId || null)
+  const [managedVenues, setManagedVenues] = useState<any[]>([])
   // Slots: array of { instruments: Instrument[], inviteOnly: boolean, payment: string }
   const [slots, setSlots] = useState<Array<{ instruments: Instrument[], inviteOnly: boolean, payment: string }>>([{ instruments: [], inviteOnly: false, payment: '' }])
+
+  // Load managed venues on mount
+  useEffect(() => {
+    const loadManagedVenues = async () => {
+      try {
+        const { data: managers } = await supabase
+          .from('venue_managers')
+          .select('venue_id')
+          .eq('user_id', user.id)
+
+        if (managers && managers.length > 0) {
+          const venueIds = managers.map((m) => m.venue_id)
+          const response = await fetch('/api/venues')
+          const { venues } = await response.json()
+          const managed = venues.filter((v: any) => venueIds.includes(v.id))
+          setManagedVenues(managed)
+        }
+      } catch (error) {
+        console.error('Error loading managed venues:', error)
+      }
+    }
+    loadManagedVenues()
+  }, [])
 
   // Slot management functions
   const addSlot = () => {
@@ -157,27 +182,36 @@ export default function NewGigContent({ user }: { user: User }) {
           instrument_slots: instrumentSlots,
           invite_only_slots: inviteOnlySlots,
           payment_per_slot: paymentPerSlot,
+          venue_id: venueId || null,
         })
         .select()
         .single()
 
       if (error) throw error
 
-      // Broadcast to network - trigger notifications
-      try {
-        await fetch('/api/gigs/notify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ gigId: data.id }),
-        })
-      } catch (notifyError) {
-        // Don't fail the gig creation if notification fails
-        console.error('Failed to send notifications:', notifyError)
+      // Broadcast to network - trigger notifications ONLY if not a venue gig
+      // Venue gigs use venue networks instead, which are managed separately
+      if (!venueId) {
+        try {
+          await fetch('/api/gigs/notify', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ gigId: data.id }),
+          })
+        } catch (notifyError) {
+          // Don't fail the gig creation if notification fails
+          console.error('Failed to send notifications:', notifyError)
+        }
       }
 
-      router.push(`/gigs/${data.id}`)
+      // If venue gig, redirect back to venue calendar
+      if (venueId) {
+        router.push(`/venues/${venueId}`)
+      } else {
+        router.push(`/gigs/${data.id}`)
+      }
     } catch (error: any) {
       console.error('Error creating gig:', error)
       setError(error.message)
@@ -193,7 +227,7 @@ export default function NewGigContent({ user }: { user: User }) {
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900">Post a New Gig</h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-gray-900">
               Create a new gig. It will be visible to all users, and your network members will be notified.
             </p>
           </div>
@@ -223,6 +257,33 @@ export default function NewGigContent({ user }: { user: User }) {
                   placeholder="e.g., Jazz Night at The Blue Note"
                 />
               </div>
+
+              {managedVenues.length > 0 && (
+                <div>
+                  <label
+                    htmlFor="venue"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Venue (Optional)
+                  </label>
+                  <select
+                    id="venue"
+                    value={venueId || ''}
+                    onChange={(e) => setVenueId(e.target.value || null)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  >
+                    <option value="">No venue (regular gig)</option>
+                    {managedVenues.map((venue) => (
+                      <option key={venue.id} value={venue.id}>
+                        {venue.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-900">
+                    Select a venue to post this gig on the venue calendar. Only venues you manage are shown.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label
@@ -274,7 +335,7 @@ export default function NewGigContent({ user }: { user: User }) {
                   required
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-900">
                   When the performance starts
                 </p>
               </div>
@@ -293,7 +354,7 @@ export default function NewGigContent({ user }: { user: User }) {
                   onChange={(e) => setCallTime(e.target.value)}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-900">
                   When musicians should arrive (optional)
                 </p>
               </div>
@@ -312,7 +373,7 @@ export default function NewGigContent({ user }: { user: User }) {
                   onChange={(e) => setEndTime(e.target.value)}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-900">
                   When the performance ends (optional)
                 </p>
               </div>
@@ -333,7 +394,7 @@ export default function NewGigContent({ user }: { user: User }) {
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                   placeholder="e.g., 2"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-900">
                   Optional: How many sets will be performed
                 </p>
               </div>
@@ -351,7 +412,7 @@ export default function NewGigContent({ user }: { user: User }) {
                     + Add Slot
                   </button>
                 </div>
-                <p className="mb-3 text-xs text-gray-500">
+                <p className="mb-3 text-xs text-gray-900">
                   Each slot represents one musician position. You can require multiple instruments per slot (e.g., "Alto Sax AND Soprano Sax").
                 </p>
                 <div className="space-y-4">
@@ -376,7 +437,7 @@ export default function NewGigContent({ user }: { user: User }) {
                       </div>
                       
                       <div className="mb-3">
-                        <label className="block text-xs font-medium text-gray-600 mb-2">
+                        <label className="block text-xs font-medium text-gray-900 mb-2">
                           Required Instruments (select all for this slot):
                         </label>
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
@@ -418,7 +479,7 @@ export default function NewGigContent({ user }: { user: User }) {
                           </span>
                         </label>
                         <div className="flex-1 max-w-xs">
-                          <label className="block text-xs text-gray-600 mb-1">
+                          <label className="block text-xs text-gray-900 mb-1">
                             Payment ($):
                           </label>
                           <input

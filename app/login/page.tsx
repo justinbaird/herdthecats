@@ -28,7 +28,10 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push('/dashboard')
+      // Check for redirect parameter
+      const urlParams = new URLSearchParams(window.location.search)
+      const redirect = urlParams.get('redirect')
+      router.push(redirect || '/dashboard')
       router.refresh()
     }
   }
@@ -40,7 +43,7 @@ export default function LoginPage() {
           <h1 className="text-center text-3xl font-bold text-gray-900">
             Herd the Cats
           </h1>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-gray-900">
             Sign in to your account
           </p>
         </div>
@@ -96,7 +99,7 @@ export default function LoginPage() {
           </div>
 
           <div className="text-center text-sm">
-            <span className="text-gray-600">Don't have an account? </span>
+            <span className="text-gray-900">Don't have an account? </span>
             <Link
               href="/signup"
               className="font-medium text-indigo-600 hover:text-indigo-500"

@@ -181,7 +181,7 @@ export default function AdminContent({ user }: { user: User }) {
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-gray-900">
               Manage users, invitations, and community settings.
             </p>
           </div>
@@ -252,19 +252,19 @@ export default function AdminContent({ user }: { user: User }) {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       Email
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       Instruments
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       Joined
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-900">
                       Actions
                     </th>
                   </tr>
@@ -275,10 +275,10 @@ export default function AdminContent({ user }: { user: User }) {
                       <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
                         {musician.name || 'N/A'}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                         {musician.email}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
+                      <td className="px-6 py-4 text-sm text-gray-900">
                         <div className="flex flex-wrap gap-1">
                           {musician.instruments?.map((inst: string) => (
                             <span
@@ -289,11 +289,11 @@ export default function AdminContent({ user }: { user: User }) {
                             </span>
                           ))}
                           {(!musician.instruments || musician.instruments.length === 0) && (
-                            <span className="text-gray-400">None</span>
+                            <span className="text-gray-900">None</span>
                           )}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                         {format(new Date(musician.created_at), 'PP')}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">

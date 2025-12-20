@@ -93,7 +93,7 @@ export default function DashboardContent({ user }: { user: User }) {
               Welcome back{musician?.name ? `, ${musician.name}` : ''}!
             </h2>
             {!musician?.name && (
-              <p className="mt-2 text-sm text-gray-600">
+              <p className="mt-2 text-sm text-gray-900">
                 Please complete your profile to get started.
               </p>
             )}
@@ -105,7 +105,7 @@ export default function DashboardContent({ user }: { user: User }) {
                 Open Gigs
               </h3>
               {gigs.length === 0 ? (
-                <p className="text-sm text-gray-500">No open gigs at the moment.</p>
+                <p className="text-sm text-gray-900">No open gigs at the moment.</p>
               ) : (
                 <ul className="space-y-4">
                   {gigs.map((gig) => (
@@ -115,10 +115,10 @@ export default function DashboardContent({ user }: { user: User }) {
                         className="block hover:text-indigo-600"
                       >
                         <h4 className="font-medium text-gray-900">{gig.title}</h4>
-                        <p className="mt-1 text-sm text-gray-600">
+                        <p className="mt-1 text-sm text-gray-900">
                           {format(new Date(gig.datetime), 'PPpp')}
                         </p>
-                        <p className="mt-1 text-sm text-gray-600">{gig.location}</p>
+                        <p className="mt-1 text-sm text-gray-900">{gig.location}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {gig.required_instruments.map((inst: string) => (
                             <span

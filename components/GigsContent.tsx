@@ -75,7 +75,7 @@ export default function GigsContent({ user }: { user: User }) {
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Gigs</h2>
-              <p className="mt-2 text-sm text-gray-600">
+              <p className="mt-2 text-sm text-gray-900">
                 Browse available gigs or manage your posted gigs.
               </p>
             </div>
@@ -122,7 +122,7 @@ export default function GigsContent({ user }: { user: User }) {
 
           {gigs.length === 0 ? (
             <div className="rounded-lg bg-white p-8 text-center shadow">
-              <p className="text-gray-500">No gigs found.</p>
+              <p className="text-gray-900">No gigs found.</p>
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -149,7 +149,7 @@ export default function GigsContent({ user }: { user: User }) {
                     </span>
                   </div>
                   {gig.description && (
-                    <p className="mb-3 text-sm text-gray-600 line-clamp-2">
+                    <p className="mb-3 text-sm text-gray-900 line-clamp-2">
                       {gig.description}
                     </p>
                   )}

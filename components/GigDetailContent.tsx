@@ -483,39 +483,39 @@ export default function GigDetailContent({
             )}
 
             <div className="mb-4 space-y-2">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-900">
                 <span className="font-medium">Location:</span> {gig.location}
               </p>
               {gig.call_time && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-900">
                   <span className="font-medium">Call Time:</span>{' '}
                   {format(new Date(gig.call_time), 'PPpp')}
                 </p>
               )}
               {gig.start_time && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-900">
                   <span className="font-medium">Start Time:</span>{' '}
                   {format(new Date(gig.start_time), 'PPpp')}
                 </p>
               )}
               {!gig.start_time && gig.datetime && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-900">
                   <span className="font-medium">Date & Time:</span>{' '}
                   {format(new Date(gig.datetime), 'PPpp')}
                 </p>
               )}
               {gig.end_time && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-900">
                   <span className="font-medium">End Time:</span>{' '}
                   {format(new Date(gig.end_time), 'PPpp')}
                 </p>
               )}
               {gig.number_of_sets && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-900">
                   <span className="font-medium">Sets:</span> {gig.number_of_sets}
                 </p>
               )}
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-900">
                 <span className="font-medium">Posted by:</span>{' '}
                 {gig.posted_by_musician?.name || 'Unknown'}
               </p>
@@ -749,7 +749,7 @@ export default function GigDetailContent({
                               {inviteSearchName &&
                                 inviteSearchResults.length === 0 &&
                                 !inviting && (
-                                  <p className="text-xs text-gray-500">
+                                  <p className="text-xs text-gray-900">
                                     No musicians found matching that name.
                                   </p>
                                 )}
@@ -775,10 +775,10 @@ export default function GigDetailContent({
                                       <p className="text-sm font-medium text-gray-900">
                                         {app.musician?.name || 'Unknown'}
                                       </p>
-                                      <p className="text-xs text-gray-600">
+                                      <p className="text-xs text-gray-900">
                                         {app.musician?.email || 'No email'}
                                       </p>
-                                      <p className="mt-1 text-xs text-gray-500">
+                                      <p className="mt-1 text-xs text-gray-900">
                                         Applied: {format(new Date(app.created_at), 'PPp')}
                                       </p>
                                     </div>
@@ -830,10 +830,10 @@ export default function GigDetailContent({
                                               <span className="ml-2 text-xs font-normal text-green-700">(You)</span>
                                             )}
                                           </p>
-                                          <p className="text-xs text-gray-600">
+                                          <p className="text-xs text-gray-900">
                                             {app.musician?.email || 'No email'}
                                           </p>
-                                          <p className="mt-1 text-xs text-gray-500">
+                                          <p className="mt-1 text-xs text-gray-900">
                                             Applied: {format(new Date(app.created_at), 'PPp')}
                                           </p>
                                           {showCalendarLinks && (
@@ -886,7 +886,7 @@ export default function GigDetailContent({
                           )}
 
                           {instrumentApps.length === 0 && (
-                            <p className="mt-2 text-sm text-gray-500">
+                            <p className="mt-2 text-sm text-gray-900">
                               No applications yet for this instrument.
                             </p>
                           )}

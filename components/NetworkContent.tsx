@@ -190,10 +190,10 @@ export default function NetworkContent({ user }: { user: User }) {
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900">My Network</h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-gray-900">
               Build your network of musicians you want to play with. When you post a gig, all musicians in your network will be notified.
             </p>
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-gray-900">
               Note: All gigs are visible to everyone on the platform. Your network only determines who receives notifications when you post new gigs.
             </p>
           </div>
@@ -242,7 +242,7 @@ export default function NetworkContent({ user }: { user: User }) {
                   >
                     <div>
                       <p className="font-medium text-gray-900">{musician.name}</p>
-                      <p className="text-sm text-gray-600">{musician.email}</p>
+                      <p className="text-sm text-gray-900">{musician.email}</p>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {musician.instruments.map((inst: string) => (
                           <span
@@ -271,7 +271,7 @@ export default function NetworkContent({ user }: { user: User }) {
               Network Members ({networkMembers.length})
             </h3>
             {networkMembers.length === 0 ? (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-900">
                 No musicians in your network yet. Search above to add some!
               </p>
             ) : (
@@ -285,7 +285,7 @@ export default function NetworkContent({ user }: { user: User }) {
                       <p className="font-medium text-gray-900">
                         {member.musician?.name || 'Unknown'}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-gray-900">
                         {member.musician?.email || 'No email'}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1">

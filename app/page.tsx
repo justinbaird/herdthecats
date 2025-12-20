@@ -17,7 +17,7 @@ export default async function Home() {
       <div className="w-full max-w-md space-y-8 text-center">
         <div>
           <h1 className="text-4xl font-bold text-gray-900">Herd the Cats</h1>
-          <p className="mt-4 text-lg text-gray-600">
+          <p className="mt-4 text-lg text-gray-900">
             Connect with musicians and manage your gigs
           </p>
         </div>

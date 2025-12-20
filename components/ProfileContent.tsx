@@ -127,7 +127,7 @@ export default function ProfileContent({ user }: { user: User }) {
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900">Your Profile</h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-gray-900">
               Update your profile information and instruments.
             </p>
           </div>
@@ -212,7 +212,7 @@ export default function ProfileContent({ user }: { user: User }) {
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-900">
                   Select your city to set your timezone for gig scheduling
                 </p>
               </div>
@@ -247,7 +247,7 @@ export default function ProfileContent({ user }: { user: User }) {
                     className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-900">
                   Optional: Your phone number for gig coordination
                 </p>
               </div>

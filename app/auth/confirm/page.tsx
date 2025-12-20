@@ -115,7 +115,7 @@ export default function ConfirmEmailPage() {
           <h1 className="text-center text-3xl font-bold text-gray-900">
             Herd the Cats
           </h1>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-gray-900">
             Email Confirmation
           </p>
         </div>
@@ -124,7 +124,7 @@ export default function ConfirmEmailPage() {
           {loading && (
             <div className="text-center">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
-              <p className="mt-4 text-sm text-gray-600">Confirming your email...</p>
+              <p className="mt-4 text-sm text-gray-900">Confirming your email...</p>
             </div>
           )}
 
@@ -148,7 +148,7 @@ export default function ConfirmEmailPage() {
               <h2 className="mt-4 text-lg font-medium text-gray-900">
                 Email Confirmed!
               </h2>
-              <p className="mt-2 text-sm text-gray-600">
+              <p className="mt-2 text-sm text-gray-900">
                 Your email has been successfully confirmed. Redirecting to dashboard...
               </p>
             </div>

@@ -57,7 +57,10 @@ export default function SignupPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push('/dashboard')
+      // Check for redirect parameter
+      const urlParams = new URLSearchParams(window.location.search)
+      const redirect = urlParams.get('redirect')
+      router.push(redirect || '/dashboard')
       router.refresh()
     }
   }
@@ -69,7 +72,7 @@ export default function SignupPage() {
           <h1 className="text-center text-3xl font-bold text-gray-900">
             Herd the Cats
           </h1>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-gray-900">
             Create your account
           </p>
         </div>
@@ -141,7 +144,7 @@ export default function SignupPage() {
           </div>
 
           <div className="text-center text-sm">
-            <span className="text-gray-600">Already have an account? </span>
+            <span className="text-gray-900">Already have an account? </span>
             <Link
               href="/login"
               className="font-medium text-indigo-600 hover:text-indigo-500"
