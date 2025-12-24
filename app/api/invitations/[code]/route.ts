@@ -5,6 +5,17 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+// Helper to ensure JSON response
+function jsonResponse(data: any, status: number = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+    },
+  })
+}
+
 // GET /api/invitations/[code] - Get invitation by code
 export async function GET(
   request: Request,
@@ -17,16 +28,16 @@ export async function GET(
       code = resolvedParams.code
     } catch (paramError: any) {
       console.error('Error resolving params:', paramError)
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Invalid invitation code parameter' },
-        { status: 400 }
+        400
       )
     }
     
     if (!code || typeof code !== 'string') {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Invitation code is required' },
-        { status: 400 }
+        400
       )
     }
 
@@ -35,9 +46,13 @@ export async function GET(
       supabase = await createServerClient()
     } catch (supabaseError: any) {
       console.error('Error creating Supabase client:', supabaseError)
-      return NextResponse.json(
-        { error: 'Failed to connect to database' },
-        { status: 500 }
+      // Return detailed error in development, generic in production
+      const errorMessage = process.env.NODE_ENV === 'development' 
+        ? `Failed to connect to database: ${supabaseError.message}`
+        : 'Failed to connect to database'
+      return jsonResponse(
+        { error: errorMessage },
+        500
       )
     }
 
@@ -56,9 +71,9 @@ export async function GET(
       queryError = result.error
     } catch (queryException: any) {
       console.error('Exception querying invitations:', queryException)
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Database query failed', details: queryException.message },
-        { status: 500 }
+        500
       )
     }
 
@@ -66,47 +81,38 @@ export async function GET(
       console.error('Supabase query error:', queryError)
       // Check if it's a "not found" error
       if (queryError.code === 'PGRST116') {
-        return NextResponse.json(
+        return jsonResponse(
           { error: 'Invitation not found' },
-          { status: 404 }
+          404
         )
       }
       // Check if table doesn't exist
       if (queryError.message?.includes('does not exist') || queryError.message?.includes('relation') || queryError.code === '42P01') {
-        return NextResponse.json(
+        return jsonResponse(
           { error: 'Database table not found. Please run the migration to create the venue_invitations table.' },
-          { status: 500 }
+          500
         )
       }
-      return NextResponse.json(
+      return jsonResponse(
         { error: queryError.message || 'Invitation not found' },
-        { status: 404 }
+        404
       )
     }
 
     if (!invitation) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Invitation not found' },
-        { status: 404 }
+        404
       )
     }
 
-    return NextResponse.json({ invitation }, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
+    return jsonResponse({ invitation })
   } catch (error: any) {
     console.error('Error fetching invitation:', error)
     // Ensure we always return JSON, not HTML
-    return NextResponse.json(
+    return jsonResponse(
       { error: error?.message || 'Internal server error' },
-      { 
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+      500
     )
   }
 }
