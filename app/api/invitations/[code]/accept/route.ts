@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
 // POST /api/invitations/[code]/accept - Accept an invitation
 export async function POST(
@@ -138,27 +139,74 @@ export async function POST(
       throw updateError
     }
 
-    // Add musician to venue network (using user.id as musician_id references auth.users)
-    const { error: networkError } = await supabase
+    // Check if musician is already in network (to avoid duplicate errors)
+    const { data: existingNetworkMember, error: checkError } = await supabase
       .from('venue_networks')
-      .insert({
-        venue_id: invitation.venue_id,
-        musician_id: user.id,
-        added_by: invitation.created_by,
+      .select('id')
+      .eq('venue_id', invitation.venue_id)
+      .eq('musician_id', user.id)
+      .maybeSingle()
+
+    if (checkError) {
+      console.error('Error checking existing network member:', checkError)
+      // Don't fail the whole process if check fails, just try to insert
+    }
+
+    // Add musician to venue network (using user.id as musician_id references auth.users)
+    // Only insert if not already in network
+    // Use service role key to bypass RLS since the musician accepting isn't a venue manager
+    if (!existingNetworkMember) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+
+      if (!supabaseUrl || !serviceRoleKey) {
+        console.error('Missing Supabase environment variables for service role client')
+        throw new Error('Server configuration error: Missing Supabase credentials')
+      }
+
+      // Create service role client to bypass RLS
+      const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
       })
 
-    if (networkError) {
-      // If network insert fails, rollback invitation status
-      await supabase
-        .from('venue_invitations')
-        .update({
-          status: 'pending',
-          accepted_by: null,
-          accepted_at: null,
+      const { data: networkMember, error: networkError } = await supabaseAdmin
+        .from('venue_networks')
+        .insert({
+          venue_id: invitation.venue_id,
+          musician_id: user.id,
+          added_by: invitation.created_by,
         })
-        .eq('id', invitation.id)
+        .select()
+        .single()
 
-      throw networkError
+      if (networkError) {
+        // Check if it's a duplicate error (unique constraint violation)
+        if (networkError.code === '23505') {
+          // Already exists, that's fine - continue without error
+          console.log('Musician already in venue network (duplicate insert prevented)')
+        } else {
+          // Other error - rollback invitation status
+          await supabase
+            .from('venue_invitations')
+            .update({
+              status: 'pending',
+              accepted_by: null,
+              accepted_at: null,
+            })
+            .eq('id', invitation.id)
+
+          console.error('Error adding to venue network:', networkError)
+          throw new Error(`Failed to add musician to venue network: ${networkError.message}`)
+        }
+      } else {
+        console.log('Successfully added musician to venue network:', networkMember?.id)
+      }
+    } else {
+      // Already in network, just log it (this is fine - they might have been added manually)
+      console.log('Musician already in venue network, skipping insert')
     }
 
     return NextResponse.json({ success: true })
