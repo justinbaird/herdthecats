@@ -207,7 +207,7 @@ export default function VenueNetworkContent({ venueId, user }: VenueNetworkConte
       }
     } else {
       // Toggle regular instrument - remove Vocals if selecting other instruments
-      const currentInstruments = formData.instruments.filter(i => i !== 'Vocals')
+      const currentInstruments = formData.instruments.filter(i => i !== 'Vocals') as Instrument[]
       if (currentInstruments.includes(instrument)) {
         setFormData({ ...formData, instruments: currentInstruments.filter(i => i !== instrument) })
       } else {
