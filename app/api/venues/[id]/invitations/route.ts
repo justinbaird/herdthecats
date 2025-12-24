@@ -92,7 +92,7 @@ export async function POST(
     } = body
 
     // Generate unique invitation code
-    let invitationCode: string
+    let invitationCode: string = ''
     let isUnique = false
     let attempts = 0
     const maxAttempts = 10
@@ -118,7 +118,7 @@ export async function POST(
       attempts++
     }
 
-    if (!isUnique) {
+    if (!isUnique || !invitationCode) {
       return NextResponse.json(
         { error: 'Failed to generate unique invitation code' },
         { status: 500 }
