@@ -3,12 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 export default function CheckEmailPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState<string | null>(null)
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
+  const [resending, setResending] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
+  const [resendError, setResendError] = useState<string | null>(null)
 
   useEffect(() => {
     // Get email and redirect URL from query params
@@ -17,7 +21,61 @@ export default function CheckEmailPage() {
     
     setEmail(emailParam)
     setRedirectUrl(redirectParam)
+
+    // If no email in params, try to get it from the current user session
+    if (!emailParam) {
+      const checkUserEmail = async () => {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user && user.email) {
+          setEmail(user.email)
+        }
+      }
+      checkUserEmail()
+    }
   }, [searchParams])
+
+  const handleResendConfirmation = async () => {
+    if (!email) {
+      setResendError('Email address is required')
+      return
+    }
+
+    setResending(true)
+    setResendError(null)
+    setResendSuccess(false)
+
+    try {
+      const supabase = createClient()
+      
+      // Get the base URL for email confirmation redirect
+      const getRedirectUrl = () => {
+        if (typeof window !== 'undefined') {
+          return `${window.location.origin}/auth/confirm`
+        }
+        return process.env.NEXT_PUBLIC_SITE_URL 
+          ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`
+          : 'http://localhost:3000/auth/confirm'
+      }
+
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: getRedirectUrl(),
+        },
+      })
+
+      if (error) throw error
+
+      setResendSuccess(true)
+      setTimeout(() => setResendSuccess(false), 5000)
+    } catch (error: any) {
+      setResendError(error.message || 'Failed to resend confirmation email')
+    } finally {
+      setResending(false)
+    }
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
@@ -83,7 +141,7 @@ export default function CheckEmailPage() {
                     />
                   </svg>
                 </div>
-                <div className="ml-3">
+                <div className="ml-3 flex-1">
                   <h3 className="text-sm font-medium text-blue-800">
                     Didn't receive the email?
                   </h3>
@@ -94,6 +152,28 @@ export default function CheckEmailPage() {
                       <li>Wait a few minutes - emails can sometimes be delayed</li>
                     </ul>
                   </div>
+                  {email && (
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={handleResendConfirmation}
+                        disabled={resending}
+                        className="text-sm font-medium text-blue-800 hover:text-blue-900 disabled:opacity-50"
+                      >
+                        {resending ? 'Sending...' : 'Resend confirmation email'}
+                      </button>
+                      {resendSuccess && (
+                        <p className="mt-1 text-sm text-green-700">
+                          Confirmation email sent! Please check your inbox.
+                        </p>
+                      )}
+                      {resendError && (
+                        <p className="mt-1 text-sm text-red-700">
+                          {resendError}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

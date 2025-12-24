@@ -19,7 +19,7 @@ export default function LoginPage() {
 
     const supabase = createClient()
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -28,6 +28,16 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
+      // Check if email is confirmed
+      if (data.user && !data.user.email_confirmed_at) {
+        // Email not confirmed - redirect to check-email page
+        const urlParams = new URLSearchParams(window.location.search)
+        const redirect = urlParams.get('redirect')
+        const checkEmailUrl = `/check-email?email=${encodeURIComponent(email)}${redirect ? `&redirect=${encodeURIComponent(redirect)}` : ''}`
+        router.push(checkEmailUrl)
+        return
+      }
+
       // Check for redirect parameter
       const urlParams = new URLSearchParams(window.location.search)
       const redirect = urlParams.get('redirect')

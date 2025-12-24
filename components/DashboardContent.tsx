@@ -36,6 +36,13 @@ export default function DashboardContent({ user }: { user: User }) {
     try {
       // Check if admin
       const { data: userData } = await supabase.auth.getUser()
+      
+      // Check if email is confirmed
+      if (userData.user && !userData.user.email_confirmed_at) {
+        router.push(`/check-email?email=${encodeURIComponent(userData.user.email || '')}`)
+        return
+      }
+      
       const metadata = userData.user?.user_metadata
       setIsAdmin(metadata?.role === 'admin')
 
