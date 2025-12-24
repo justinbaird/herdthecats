@@ -50,6 +50,74 @@ export async function POST(
     const body = await request.json()
     const { firstName, lastName, email, phone, instruments } = body
 
+    // Ensure user has a musician profile
+    const { data: existingMusician } = await supabase
+      .from('musicians')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    let musicianId: string
+
+    if (!existingMusician) {
+      // Create musician profile
+      const musicianName = firstName && lastName
+        ? `${firstName} ${lastName}`.trim()
+        : invitation.musician_first_name && invitation.musician_last_name
+        ? `${invitation.musician_first_name} ${invitation.musician_last_name}`.trim()
+        : user.email?.split('@')[0] || 'Musician'
+
+      const { data: newMusician, error: createError } = await supabase
+        .from('musicians')
+        .insert({
+          user_id: user.id,
+          name: musicianName,
+          email: email || invitation.musician_email || user.email || '',
+          phone: phone || invitation.musician_phone || null,
+          instruments: instruments || invitation.musician_instruments || [],
+        })
+        .select()
+        .single()
+
+      if (createError) {
+        console.error('Error creating musician profile:', createError)
+        throw createError
+      }
+      musicianId = newMusician.id
+    } else {
+      // Update existing musician profile with invitation data
+      const updateData: any = {}
+      if (firstName && lastName) {
+        updateData.name = `${firstName} ${lastName}`.trim()
+      } else if (invitation.musician_first_name && invitation.musician_last_name) {
+        updateData.name = `${invitation.musician_first_name} ${invitation.musician_last_name}`.trim()
+      }
+      if (email || invitation.musician_email) {
+        updateData.email = email || invitation.musician_email
+      }
+      if (phone || invitation.musician_phone) {
+        updateData.phone = phone || invitation.musician_phone
+      }
+      if (instruments && instruments.length > 0) {
+        updateData.instruments = instruments
+      } else if (invitation.musician_instruments && invitation.musician_instruments.length > 0) {
+        updateData.instruments = invitation.musician_instruments
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        const { error: updateError } = await supabase
+          .from('musicians')
+          .update(updateData)
+          .eq('id', existingMusician.id)
+
+        if (updateError) {
+          console.error('Error updating musician profile:', updateError)
+          throw updateError
+        }
+      }
+      musicianId = existingMusician.id
+    }
+
     // Update invitation status
     const { error: updateError } = await supabase
       .from('venue_invitations')
@@ -65,9 +133,12 @@ export async function POST(
       })
       .eq('id', invitation.id)
 
-    if (updateError) throw updateError
+    if (updateError) {
+      console.error('Error updating invitation:', updateError)
+      throw updateError
+    }
 
-    // Add musician to venue network
+    // Add musician to venue network (using user.id as musician_id references auth.users)
     const { error: networkError } = await supabase
       .from('venue_networks')
       .insert({
