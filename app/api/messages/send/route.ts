@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 // POST /api/messages/send - Send a message to a user via email or WhatsApp
 export async function POST(request: Request) {
   try {
@@ -45,6 +43,17 @@ export async function POST(request: Request) {
         : user.email || 'Venue Manager'
 
       const senderEmail = senderProfile?.email || user.email || 'noreply@herdthecats.app'
+
+      // Initialize Resend client lazily (only when needed)
+      const resendApiKey = process.env.RESEND_API_KEY
+      if (!resendApiKey) {
+        return NextResponse.json(
+          { error: 'Email service not configured. RESEND_API_KEY is missing.' },
+          { status: 500 }
+        )
+      }
+
+      const resend = new Resend(resendApiKey)
 
       // Send email using Resend
       const { data, error: emailError } = await resend.emails.send({
