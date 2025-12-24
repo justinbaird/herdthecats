@@ -84,9 +84,9 @@ export async function POST(
     const body = await request.json()
     const { first_name, last_name, email, phone, country_code, instruments, notes } = body
 
-    if (!email && !phone) {
+    if (!phone) {
       return NextResponse.json(
-        { error: 'Email or phone number is required' },
+        { error: 'WhatsApp number is required' },
         { status: 400 }
       )
     }

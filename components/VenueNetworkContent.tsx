@@ -419,8 +419,8 @@ export default function VenueNetworkContent({ venueId, user }: VenueNetworkConte
 
   const handleAddContact = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!contactFormData.email && !contactFormData.phone) {
-      setError('Email or phone number is required')
+    if (!contactFormData.phone) {
+      setError('WhatsApp number is required')
       return
     }
 
@@ -1228,7 +1228,7 @@ export default function VenueNetworkContent({ venueId, user }: VenueNetworkConte
                   />
                 </div>
                 <p className="mt-1 text-xs text-gray-900">
-                  At least email or WhatsApp number is required
+                  WhatsApp number is required. Email is optional.
                 </p>
               </div>
 
@@ -1318,13 +1318,13 @@ export default function VenueNetworkContent({ venueId, user }: VenueNetworkConte
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={addingContact || (!contactFormData.email && !contactFormData.phone)}
-                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:bg-gray-400"
-                >
-                  {addingContact ? 'Adding...' : 'Add Contact'}
-                </button>
+                  <button
+                    type="submit"
+                    disabled={addingContact || !contactFormData.phone}
+                    className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:bg-gray-400"
+                  >
+                    {addingContact ? 'Adding...' : 'Add Contact'}
+                  </button>
               </div>
             </form>
           </div>
