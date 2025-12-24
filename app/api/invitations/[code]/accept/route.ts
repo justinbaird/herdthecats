@@ -212,7 +212,28 @@ export async function POST(
       console.log('Musician already in venue network, skipping insert')
     }
 
-    return NextResponse.json({ success: true })
+    // Verify the musician is in the network (double-check)
+    const { data: verifyNetworkMember, error: verifyError } = await supabaseAdmin
+      .from('venue_networks')
+      .select('id')
+      .eq('venue_id', invitation.venue_id)
+      .eq('musician_id', user.id)
+      .maybeSingle()
+
+    if (verifyError) {
+      console.error('Error verifying network membership:', verifyError)
+    } else if (!verifyNetworkMember) {
+      console.error('WARNING: Musician was not found in network after insert attempt!')
+      // Don't fail the whole process, but log the warning
+    } else {
+      console.log('Verified: Musician is in venue network:', verifyNetworkMember.id)
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      networkAdded: !!verifyNetworkMember,
+      networkMemberId: verifyNetworkMember?.id 
+    })
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
