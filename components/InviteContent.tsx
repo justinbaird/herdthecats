@@ -77,6 +77,15 @@ export default function InviteContent({ invitationCode, user: initialUser }: Inv
       }
 
       setInvitation(inviteData)
+      
+      // Check if user is logged in but email is not confirmed
+      if (user) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session && session.user && !session.user.email_confirmed_at) {
+          // User is logged in but email not confirmed - show message
+          setError('Please confirm your email address before accepting the invitation. Check your inbox for the confirmation email.')
+        }
+      }
 
       // Pre-fill form with invitation data if available
       if (inviteData.musician_first_name) {
@@ -129,6 +138,13 @@ export default function InviteContent({ invitationCode, user: initialUser }: Inv
     if (!user) {
       const redirectUrl = `/invite/${invitationCode}`
       router.push(`/signup?redirect=${encodeURIComponent(redirectUrl)}`)
+      return
+    }
+
+    // Check if user's email is confirmed
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session && session.user && !session.user.email_confirmed_at) {
+      setError('Please confirm your email address before accepting the invitation. Check your inbox for the confirmation email, or click "Resend confirmation email" below.')
       return
     }
 
@@ -261,6 +277,31 @@ export default function InviteContent({ invitationCode, user: initialUser }: Inv
             {error && (
               <div className="mb-4 rounded-md bg-red-50 p-4">
                 <p className="text-sm text-red-800">{error}</p>
+                {error.includes('confirm your email') && user && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const { error: resendError } = await supabase.auth.resend({
+                            type: 'signup',
+                            email: user.email || '',
+                            options: {
+                              emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/confirm`,
+                            },
+                          })
+                          if (resendError) throw resendError
+                          setError('Confirmation email sent! Please check your inbox.')
+                        } catch (err: any) {
+                          setError(`Failed to resend email: ${err.message}`)
+                        }
+                      }}
+                      className="mt-2 text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                    >
+                      Resend confirmation email
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

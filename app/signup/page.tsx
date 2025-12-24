@@ -60,8 +60,10 @@ export default function SignupPage() {
       // Check for redirect parameter
       const urlParams = new URLSearchParams(window.location.search)
       const redirect = urlParams.get('redirect')
-      router.push(redirect || '/dashboard')
-      router.refresh()
+      
+      // Redirect to check-email page with email and redirect URL
+      const checkEmailUrl = `/check-email?email=${encodeURIComponent(email)}${redirect ? `&redirect=${encodeURIComponent(redirect)}` : ''}`
+      router.push(checkEmailUrl)
     }
   }
 
