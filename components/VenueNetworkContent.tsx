@@ -1259,7 +1259,7 @@ export default function VenueNetworkContent({ venueId, user }: VenueNetworkConte
                       key={instrument}
                       type="button"
                       onClick={() => {
-                        const currentInstruments = contactFormData.instruments.filter(i => i !== 'Vocals')
+                        const currentInstruments = contactFormData.instruments.filter(i => i !== 'Vocals') as Instrument[]
                         if (currentInstruments.includes(instrument)) {
                           setContactFormData({
                             ...contactFormData,
