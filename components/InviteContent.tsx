@@ -110,7 +110,8 @@ export default function InviteContent({ invitationCode, user: initialUser }: Inv
         setFormData({ ...formData, instruments: ['Vocals' as Instrument] })
       }
     } else {
-      const currentInstruments = formData.instruments.filter(i => i !== 'Vocals')
+      // Filter out 'Vocals' and ensure we're working with non-Vocals instruments
+      const currentInstruments = formData.instruments.filter(i => i !== 'Vocals') as Instrument[]
       if (currentInstruments.includes(instrument)) {
         setFormData({ ...formData, instruments: currentInstruments.filter(i => i !== instrument) })
       } else {
