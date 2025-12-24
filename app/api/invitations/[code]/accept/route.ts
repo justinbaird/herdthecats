@@ -74,7 +74,7 @@ export async function POST(
           user_id: user.id,
           name: musicianName,
           email: email || invitation.musician_email || user.email || '',
-          phone: phone || invitation.musician_phone || null,
+          phone_number: phone || invitation.musician_phone || null,
           instruments: instruments || invitation.musician_instruments || [],
         })
         .select()
@@ -97,7 +97,7 @@ export async function POST(
         updateData.email = email || invitation.musician_email
       }
       if (phone || invitation.musician_phone) {
-        updateData.phone = phone || invitation.musician_phone
+        updateData.phone_number = phone || invitation.musician_phone
       }
       if (instruments && instruments.length > 0) {
         updateData.instruments = instruments
