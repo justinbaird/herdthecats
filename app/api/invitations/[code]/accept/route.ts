@@ -139,8 +139,26 @@ export async function POST(
       throw updateError
     }
 
-    // Check if musician is already in network (to avoid duplicate errors)
-    const { data: existingNetworkMember, error: checkError } = await supabase
+    // Add musician to venue network (using user.id as musician_id references auth.users)
+    // Use service role key to bypass RLS since the musician accepting isn't a venue manager
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Missing Supabase environment variables for service role client')
+      throw new Error('Server configuration error: Missing Supabase credentials')
+    }
+
+    // Create service role client to bypass RLS
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    // Check if musician is already in network (using admin client to bypass RLS)
+    const { data: existingNetworkMember, error: checkError } = await supabaseAdmin
       .from('venue_networks')
       .select('id')
       .eq('venue_id', invitation.venue_id)
@@ -152,26 +170,10 @@ export async function POST(
       // Don't fail the whole process if check fails, just try to insert
     }
 
-    // Add musician to venue network (using user.id as musician_id references auth.users)
     // Only insert if not already in network
-    // Use service role key to bypass RLS since the musician accepting isn't a venue manager
     if (!existingNetworkMember) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
-
-      if (!supabaseUrl || !serviceRoleKey) {
-        console.error('Missing Supabase environment variables for service role client')
-        throw new Error('Server configuration error: Missing Supabase credentials')
-      }
-
-      // Create service role client to bypass RLS
-      const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      })
-
+      console.log(`Adding musician ${user.id} to venue network ${invitation.venue_id}`)
+      
       const { data: networkMember, error: networkError } = await supabaseAdmin
         .from('venue_networks')
         .insert({
@@ -199,7 +201,8 @@ export async function POST(
             .eq('id', invitation.id)
 
           console.error('Error adding to venue network:', networkError)
-          throw new Error(`Failed to add musician to venue network: ${networkError.message}`)
+          console.error('Network error details:', JSON.stringify(networkError, null, 2))
+          throw new Error(`Failed to add musician to venue network: ${networkError.message || JSON.stringify(networkError)}`)
         }
       } else {
         console.log('Successfully added musician to venue network:', networkMember?.id)

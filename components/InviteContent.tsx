@@ -212,8 +212,21 @@ export default function InviteContent({ invitationCode, user: initialUser }: Inv
         }),
       })
 
-      const { error: acceptError } = await response.json()
-      if (acceptError) throw new Error(acceptError)
+      // Check response status first
+      if (!response.ok) {
+        const errorText = await response.text()
+        let errorMessage = `Failed to accept invitation: ${response.status}`
+        try {
+          const errorData = JSON.parse(errorText)
+          errorMessage = errorData.error || errorMessage
+        } catch {
+          errorMessage = errorText || errorMessage
+        }
+        throw new Error(errorMessage)
+      }
+
+      const data = await response.json()
+      if (data.error) throw new Error(data.error)
 
       // Redirect to venue page
       router.push(`/venues/${invitation.venue_id}`)
