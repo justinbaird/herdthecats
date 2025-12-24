@@ -1,7 +1,28 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
-// GET /api/venues/[id]/invitations - List venue invitations
+// Helper to generate a unique invitation code
+async function generateUniqueInvitationCode(supabase: any): Promise<string> {
+  let code: string
+  let isUnique = false
+  do {
+    const { data, error } = await supabase.rpc('generate_venue_manager_invitation_code')
+    if (error) throw error
+    code = data
+
+    const { data: existing, error: checkError } = await supabase
+      .from('venue_manager_invitations')
+      .select('id')
+      .eq('invitation_code', code)
+      .maybeSingle()
+
+    if (checkError) throw checkError
+    isUnique = !existing
+  } while (!isUnique)
+  return code
+}
+
+// GET /api/venues/[id]/manager-invitations - List venue manager invitations
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -25,24 +46,23 @@ export async function GET(
       .eq('user_id', user.id)
       .maybeSingle()
 
-    const metadata = user.user_metadata
-    const isAdmin = metadata?.role === 'admin'
+    const isAdmin = user.user_metadata?.role === 'admin'
 
     if (!manager && !isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Get venue invitations
     const { data: invitations, error } = await supabase
-      .from('venue_invitations')
+      .from('venue_manager_invitations')
       .select('*')
       .eq('venue_id', id)
       .order('created_at', { ascending: false })
 
     if (error) throw error
 
-    return NextResponse.json({ invitations: invitations || [] })
+    return NextResponse.json({ invitations })
   } catch (error: any) {
+    console.error('Error fetching venue manager invitations:', error)
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
@@ -50,13 +70,13 @@ export async function GET(
   }
 }
 
-// POST /api/venues/[id]/invitations - Create a new invitation
+// POST /api/venues/[id]/manager-invitations - Create a new venue manager invitation
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
+    const { id: venueId } = await params
     const supabase = await createServerClient()
     const {
       data: { user },
@@ -70,79 +90,36 @@ export async function POST(
     const { data: manager } = await supabase
       .from('venue_managers')
       .select('id')
-      .eq('venue_id', id)
+      .eq('venue_id', venueId)
       .eq('user_id', user.id)
       .maybeSingle()
 
-    const metadata = user.user_metadata
-    const isAdmin = metadata?.role === 'admin'
+    const isAdmin = user.user_metadata?.role === 'admin'
 
     if (!manager && !isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
-    const {
-      musician_email,
-      musician_first_name,
-      musician_last_name,
-      musician_phone,
-      musician_instruments,
-      expires_in_days,
-    } = body
+    const { email, expires_at } = body
 
-    // Generate unique invitation code
-    let invitationCode: string
-    let isUnique = false
-    let attempts = 0
-    const maxAttempts = 10
-
-    while (!isUnique && attempts < maxAttempts) {
-      // Generate 8-character code
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-      invitationCode = ''
-      for (let i = 0; i < 8; i++) {
-        invitationCode += chars.charAt(Math.floor(Math.random() * chars.length))
-      }
-
-      // Check if code exists
-      const { data: existing } = await supabase
-        .from('venue_invitations')
-        .select('id')
-        .eq('invitation_code', invitationCode)
-        .single()
-
-      if (!existing) {
-        isUnique = true
-      }
-      attempts++
-    }
-
-    if (!isUnique) {
+    if (!email) {
       return NextResponse.json(
-        { error: 'Failed to generate unique invitation code' },
-        { status: 500 }
+        { error: 'Email is required' },
+        { status: 400 }
       )
     }
 
-    // Calculate expiration date (default 30 days)
-    const expiresAt = expires_in_days
-      ? new Date(Date.now() + expires_in_days * 24 * 60 * 60 * 1000).toISOString()
-      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    const invitation_code = await generateUniqueInvitationCode(supabase)
 
-    // Create invitation
     const { data: invitation, error } = await supabase
-      .from('venue_invitations')
+      .from('venue_manager_invitations')
       .insert({
-        venue_id: id,
-        invitation_code: invitationCode,
-        created_by: user.id,
-        musician_email: musician_email || null,
-        musician_first_name: musician_first_name || null,
-        musician_last_name: musician_last_name || null,
-        musician_phone: musician_phone || null,
-        musician_instruments: musician_instruments || null,
-        expires_at: expiresAt,
+        venue_id: venueId,
+        email,
+        invitation_code,
+        invited_by: user.id,
+        expires_at: expires_at || null,
       })
       .select()
       .single()
@@ -151,6 +128,7 @@ export async function POST(
 
     return NextResponse.json({ invitation }, { status: 201 })
   } catch (error: any) {
+    console.error('Error creating venue manager invitation:', error)
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

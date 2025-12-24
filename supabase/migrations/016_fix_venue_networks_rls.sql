@@ -18,3 +18,4 @@ CREATE POLICY "Venue managers can remove from venue network"
     is_venue_manager_for(venue_networks.venue_id)
   );
 
+

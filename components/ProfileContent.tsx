@@ -222,7 +222,7 @@ export default function ProfileContent({ user }: { user: User }) {
                   htmlFor="phone-number"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  Phone Number
+                  WhatsApp Number
                 </label>
                 <div className="mt-1 flex gap-2">
                   <select
@@ -243,12 +243,12 @@ export default function ProfileContent({ user }: { user: User }) {
                     id="phone-number"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="Phone number"
+                    placeholder="WhatsApp number"
                     className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                   />
                 </div>
                 <p className="mt-1 text-xs text-gray-900">
-                  Optional: Your phone number for gig coordination
+                  Optional: Your WhatsApp number for messaging and gig coordination
                 </p>
               </div>
 

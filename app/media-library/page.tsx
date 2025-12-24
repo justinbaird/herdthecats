@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import VenuesContent from '@/components/VenuesContent'
+import MediaLibraryContent from '@/components/MediaLibraryContent'
 
-export default async function VenuesPage() {
+export default async function MediaLibraryPage() {
   const supabase = await createClient()
   const {
     data: { user },
@@ -12,7 +12,7 @@ export default async function VenuesPage() {
     redirect('/login')
   }
 
-  return <VenuesContent user={user} />
+  return <MediaLibraryContent user={user} />
 }
 
 

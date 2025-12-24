@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import Link from 'next/link'
 import Navigation from './Navigation'
+import VenueNetworkContent from './VenueNetworkContent'
+import type { Venue } from '@/lib/supabase/types'
 
 interface NetworkMember {
   id: string
@@ -26,10 +28,47 @@ export default function NetworkContent({ user }: { user: User }) {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [isVenueManager, setIsVenueManager] = useState(false)
+  const [venues, setVenues] = useState<Venue[]>([])
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null)
 
   useEffect(() => {
-    loadNetwork()
+    checkVenueManagerStatus()
   }, [])
+
+  useEffect(() => {
+    if (isVenueManager && selectedVenueId) {
+      // Venue manager view - don't load regular network
+      setLoading(false)
+    } else if (!isVenueManager) {
+      // Regular musician view - load network
+      loadNetwork()
+    }
+  }, [isVenueManager, selectedVenueId])
+
+  const checkVenueManagerStatus = async () => {
+    try {
+      const response = await fetch('/api/venue-manager/venues')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.venues && data.venues.length > 0) {
+          setIsVenueManager(true)
+          setVenues(data.venues)
+          setSelectedVenueId(data.venues[0].id)
+        } else {
+          setIsVenueManager(false)
+          loadNetwork()
+        }
+      } else {
+        setIsVenueManager(false)
+        loadNetwork()
+      }
+    } catch (error) {
+      console.error('Error checking venue manager status:', error)
+      setIsVenueManager(false)
+      loadNetwork()
+    }
+  }
 
   const loadNetwork = async () => {
     try {
@@ -182,6 +221,49 @@ export default function NetworkContent({ user }: { user: User }) {
     )
   }
 
+  // Show Venue Network for venue managers
+  if (isVenueManager && selectedVenueId) {
+    const selectedVenue = venues.find((v) => v.id === selectedVenueId)
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation user={user} />
+        <main className="mx-auto max-w-4xl py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900">Venue Network</h2>
+              {venues.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="venue-select" className="text-sm font-medium text-gray-900">
+                    Venue:
+                  </label>
+                  <select
+                    id="venue-select"
+                    value={selectedVenueId}
+                    onChange={(e) => setSelectedVenueId(e.target.value)}
+                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                  >
+                    {venues.map((venue) => (
+                      <option key={venue.id} value={venue.id}>
+                        {venue.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            {selectedVenue && (
+              <p className="mb-4 text-sm text-gray-900">
+                Manage musicians in the network for <strong>{selectedVenue.name}</strong>.
+              </p>
+            )}
+            <VenueNetworkContent venueId={selectedVenueId} user={user} />
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // Regular musician network view
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation user={user} />

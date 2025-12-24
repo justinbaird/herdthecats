@@ -7,6 +7,8 @@ import type { User } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import Navigation from './Navigation'
+import VenueCalendarContent from './VenueCalendarContent'
+import type { Venue } from '@/lib/supabase/types'
 
 export default function DashboardContent({ user }: { user: User }) {
   const router = useRouter()
@@ -15,10 +17,20 @@ export default function DashboardContent({ user }: { user: User }) {
   const [musician, setMusician] = useState<any>(null)
   const [gigs, setGigs] = useState<any[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isVenueManager, setIsVenueManager] = useState(false)
+  const [venues, setVenues] = useState<Venue[]>([])
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null)
+  const [venueManagerProfile, setVenueManagerProfile] = useState<any>(null)
 
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    if (selectedVenueId && isVenueManager) {
+      // Venue selected, calendar will load via VenueCalendarContent
+    }
+  }, [selectedVenueId, isVenueManager])
 
   const loadData = async () => {
     try {
@@ -27,39 +39,79 @@ export default function DashboardContent({ user }: { user: User }) {
       const metadata = userData.user?.user_metadata
       setIsAdmin(metadata?.role === 'admin')
 
-      // Load musician profile
-      const { data: musicianData } = await supabase
-        .from('musicians')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
+      // Check if user is a venue manager
+      const venuesResponse = await fetch('/api/venue-manager/venues')
+      let isManager = false
+      if (venuesResponse.ok) {
+        const venuesData = await venuesResponse.json()
+        console.log('Venues data:', venuesData) // Debug log
+        if (venuesData.venues && venuesData.venues.length > 0) {
+          isManager = true
+          setIsVenueManager(true)
+          setVenues(venuesData.venues)
+          // Set first venue as selected by default
+          if (venuesData.venues.length > 0) {
+            setSelectedVenueId(venuesData.venues[0].id)
+          }
+        } else {
+          console.log('No venues found for user') // Debug log
+        }
+      } else {
+        try {
+          const errorData = await venuesResponse.json()
+          console.error('Error fetching venues:', JSON.stringify(errorData, null, 2)) // Debug log
+        } catch (e) {
+          const text = await venuesResponse.text().catch(() => 'Unable to read error')
+          console.error('Error fetching venues - non-JSON response:', venuesResponse.status, venuesResponse.statusText, text.substring(0, 200))
+        }
+      }
 
-      setMusician(musicianData)
-
-      // Load gigs
-      const { data: gigsData } = await supabase
-        .from('gigs')
-        .select('*')
-        .eq('status', 'open')
-        .order('datetime', { ascending: true })
-        .limit(10)
-
-      // Get musician profiles for posters
-      if (gigsData && gigsData.length > 0) {
-        const posterIds = [...new Set(gigsData.map((gig) => gig.posted_by))]
-        const { data: musiciansData } = await supabase
+      // Load venue manager profile if they are a venue manager
+      if (isManager) {
+        const profileResponse = await fetch('/api/venue-manager-profile')
+        if (profileResponse.ok) {
+          const profileContentType = profileResponse.headers.get('content-type') || ''
+          const profileIsJson = profileContentType.includes('application/json')
+          if (profileIsJson) {
+            const profileData = await profileResponse.json()
+            setVenueManagerProfile(profileData.profile)
+          }
+        }
+      } else {
+        // Load musician profile (for non-venue managers)
+        const { data: musicianData } = await supabase
           .from('musicians')
           .select('*')
-          .in('user_id', posterIds)
+          .eq('user_id', user.id)
+          .single()
 
-        const gigsWithPosters = gigsData.map((gig) => ({
-          ...gig,
-          posted_by_musician: musiciansData?.find((m) => m.user_id === gig.posted_by) || null,
-        }))
+        setMusician(musicianData)
 
-        setGigs(gigsWithPosters)
-      } else {
-        setGigs([])
+        // Load gigs
+        const { data: gigsData } = await supabase
+          .from('gigs')
+          .select('*')
+          .eq('status', 'open')
+          .order('datetime', { ascending: true })
+          .limit(10)
+
+        // Get musician profiles for posters
+        if (gigsData && gigsData.length > 0) {
+          const posterIds = [...new Set(gigsData.map((gig) => gig.posted_by))]
+          const { data: musiciansData } = await supabase
+            .from('musicians')
+            .select('*')
+            .in('user_id', posterIds)
+
+          const gigsWithPosters = gigsData.map((gig) => ({
+            ...gig,
+            posted_by_musician: musiciansData?.find((m) => m.user_id === gig.posted_by) || null,
+          }))
+
+          setGigs(gigsWithPosters)
+        } else {
+          setGigs([])
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -82,6 +134,63 @@ export default function DashboardContent({ user }: { user: User }) {
     )
   }
 
+  // If venue manager, show venue calendar dashboard
+  if (isVenueManager && selectedVenueId) {
+    // Check if profile is complete
+    if (!venueManagerProfile) {
+      // Redirect to profile setup
+      router.push('/venue-manager/setup')
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-lg">Redirecting to profile setup...</div>
+        </div>
+      )
+    }
+
+    const selectedVenue = venues.find((v) => v.id === selectedVenueId)
+
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation user={user} />
+        <main className="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {selectedVenue?.name || 'Venue Calendar'}
+                </h1>
+                <p className="mt-1 text-sm text-gray-900">
+                  Welcome back, {venueManagerProfile.first_name} {venueManagerProfile.last_name}
+                </p>
+              </div>
+              {venues.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="venue-select" className="text-sm font-medium text-gray-900">
+                    Venue:
+                  </label>
+                  <select
+                    id="venue-select"
+                    value={selectedVenueId}
+                    onChange={(e) => setSelectedVenueId(e.target.value)}
+                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                  >
+                    {venues.map((venue) => (
+                      <option key={venue.id} value={venue.id}>
+                        {venue.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <VenueCalendarContent venueId={selectedVenueId} user={user} />
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // Regular musician dashboard
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation user={user} />

@@ -6,11 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { format } from 'date-fns'
-import Navigation from './Navigation'
 import VenueCalendar from './VenueCalendar'
-import VenueNetworkContent from './VenueNetworkContent'
 import type { Venue, Gig } from '@/lib/supabase/types'
-import { COUNTRIES } from '@/lib/countries'
 
 export default function VenueCalendarContent({
   venueId,
@@ -52,6 +49,28 @@ export default function VenueCalendarContent({
 
       // Load venue
       const venueResponse = await fetch(`/api/venues/${venueId}`)
+      const venueContentType = venueResponse.headers.get('content-type') || ''
+      const venueIsJson = venueContentType.includes('application/json')
+      
+      if (!venueResponse.ok) {
+        const errorText = await venueResponse.text()
+        if (venueIsJson) {
+          try {
+            const errorData = JSON.parse(errorText)
+            throw new Error(errorData.error || `Failed to load venue: ${venueResponse.status}`)
+          } catch {
+            throw new Error(`Failed to load venue: ${venueResponse.status}`)
+          }
+        } else {
+          throw new Error(`Failed to load venue: ${venueResponse.status}. Server returned: ${errorText.substring(0, 100)}`)
+        }
+      }
+      
+      if (!venueIsJson) {
+        const text = await venueResponse.text()
+        throw new Error(`Expected JSON but got ${venueContentType}. Response: ${text.substring(0, 100)}`)
+      }
+      
       const { venue: venueData, error: venueError } = await venueResponse.json()
       if (venueError) throw new Error(venueError)
       setVenue(venueData)
@@ -67,8 +86,12 @@ export default function VenueCalendarContent({
         try {
           const managerCheckResponse = await fetch(`/api/venues/${venueId}/is-manager`)
           if (managerCheckResponse.ok) {
-            const { isManager } = await managerCheckResponse.json()
-            userIsManager = isManager || false
+            const managerContentType = managerCheckResponse.headers.get('content-type') || ''
+            const managerIsJson = managerContentType.includes('application/json')
+            if (managerIsJson) {
+              const { isManager } = await managerCheckResponse.json()
+              userIsManager = isManager || false
+            }
           }
         } catch (err) {
           console.error('Error checking manager status:', err)
@@ -82,6 +105,28 @@ export default function VenueCalendarContent({
 
       // Load gigs
       const gigsResponse = await fetch(`/api/venues/${venueId}/gigs`)
+      const gigsContentType = gigsResponse.headers.get('content-type') || ''
+      const gigsIsJson = gigsContentType.includes('application/json')
+      
+      if (!gigsResponse.ok) {
+        const errorText = await gigsResponse.text()
+        if (gigsIsJson) {
+          try {
+            const errorData = JSON.parse(errorText)
+            throw new Error(errorData.error || `Failed to load gigs: ${gigsResponse.status}`)
+          } catch {
+            throw new Error(`Failed to load gigs: ${gigsResponse.status}`)
+          }
+        } else {
+          throw new Error(`Failed to load gigs: ${gigsResponse.status}. Server returned: ${errorText.substring(0, 100)}`)
+        }
+      }
+      
+      if (!gigsIsJson) {
+        const text = await gigsResponse.text()
+        throw new Error(`Expected JSON but got ${gigsContentType}. Response: ${text.substring(0, 100)}`)
+      }
+      
       const { gigs: gigsData, error: gigsError } = await gigsResponse.json()
       if (gigsError) throw new Error(gigsError)
 
@@ -163,68 +208,22 @@ export default function VenueCalendarContent({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navigation user={user} />
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-lg">Loading venue calendar...</div>
-        </div>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-lg">Loading venue calendar...</div>
       </div>
     )
   }
 
   if (!venue) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navigation user={user} />
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-lg text-red-600">Venue not found</div>
-        </div>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-lg text-red-600">Venue not found</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navigation user={user} />
-
-      <main className="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="mb-6">
-            <Link
-              href="/venues"
-              className="text-sm text-indigo-600 hover:text-indigo-800"
-            >
-              ← Back to Venues
-            </Link>
-          </div>
-
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{venue.name}</h1>
-              <p className="mt-2 text-gray-900">{venue.address}</p>
-              {venue.city && (
-                <p className="text-gray-900">
-                  {venue.city}
-                  {venue.state && `, ${venue.state}`}
-                  {venue.zip_code && ` ${venue.zip_code}`}
-                </p>
-              )}
-              {venue.country && (
-                <p className="text-gray-900">
-                  {COUNTRIES.find(c => c.code === venue.country)?.name || venue.country}
-                </p>
-              )}
-            </div>
-            {isManager && (
-              <Link
-                href={`/gigs/new?venueId=${venueId}`}
-                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-              >
-                Post Gig
-              </Link>
-            )}
-          </div>
-
+    <div>
           {error && (
             <div className="mb-4 rounded-md bg-red-50 p-4">
               <p className="text-sm text-red-800">{error}</p>
@@ -234,7 +233,7 @@ export default function VenueCalendarContent({
           {isManager && (
             <div className="mb-6 rounded-lg bg-blue-50 p-4">
               <p className="text-sm text-blue-800">
-                You are a venue manager. You can post gigs and invite musicians
+                You are signed in as a <strong>venue manager</strong>. You can post gigs and invite musicians
                 to view specific gigs.
               </p>
             </div>
@@ -362,15 +361,6 @@ export default function VenueCalendarContent({
               </form>
             </div>
           )}
-
-          {/* Venue Network Section - Only for managers */}
-          {isManager && (
-            <div className="mt-8">
-              <VenueNetworkContent venueId={venueId} user={user} />
-            </div>
-          )}
-        </div>
-      </main>
     </div>
   )
 }

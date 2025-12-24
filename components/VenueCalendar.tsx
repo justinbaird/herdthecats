@@ -60,9 +60,9 @@ export default function VenueCalendar({ gigs, venueId, isManager }: VenueCalenda
 
     return (
       <div className="rounded-lg bg-white shadow">
-        <div className="grid grid-cols-7 border-b">
+        <div className="grid grid-cols-7">
           {weekDays.map((day) => (
-            <div key={day} className="border-r p-2 text-center text-sm font-semibold text-gray-900 last:border-r-0">
+            <div key={day} className="border-b border-r p-2 text-center text-sm font-semibold text-gray-900 last:border-r-0">
               {day}
             </div>
           ))}
@@ -95,8 +95,8 @@ export default function VenueCalendar({ gigs, venueId, isManager }: VenueCalenda
                   {isManager && isCurrentMonth && (
                     <Link
                       href={`/gigs/new?venueId=${venueId}&date=${format(day, 'yyyy-MM-dd')}`}
-                      className="text-xs text-indigo-600 hover:text-indigo-800"
-                      title="Add gig"
+                      className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+                      title="Add entry"
                     >
                       +
                     </Link>
@@ -137,9 +137,9 @@ export default function VenueCalendar({ gigs, venueId, isManager }: VenueCalenda
 
     return (
       <div className="rounded-lg bg-white shadow">
-        <div className="grid grid-cols-7 border-b">
+        <div className="grid grid-cols-7">
           {weekDays.map((day, idx) => (
-            <div key={day} className="border-r p-3 text-center text-sm font-semibold text-gray-900 last:border-r-0">
+            <div key={day} className="border-b border-r p-3 text-center text-sm font-semibold text-gray-900 last:border-r-0">
               <div>{day}</div>
               <div className={`mt-1 text-lg ${isSameDay(days[idx], new Date()) ? 'text-indigo-600' : 'text-gray-700'}`}>
                 {format(days[idx], 'd')}
@@ -162,9 +162,9 @@ export default function VenueCalendar({ gigs, venueId, isManager }: VenueCalenda
                 {isManager && (
                   <Link
                     href={`/gigs/new?venueId=${venueId}&date=${format(day, 'yyyy-MM-dd')}`}
-                    className="mb-2 block rounded-md bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                    className="mb-2 block rounded-md bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700 text-center"
                   >
-                    + Add Gig
+                    + Add Entry
                   </Link>
                 )}
                 <div className="space-y-2">

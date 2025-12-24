@@ -12,12 +12,26 @@ export default function Navigation({ user }: { user: User }) {
   const pathname = usePathname()
   const supabase = createClient()
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isVenueManager, setIsVenueManager] = useState(false)
   const [musicianProfile, setMusicianProfile] = useState<any>(null)
 
   useEffect(() => {
     checkAdmin()
+    checkVenueManager()
     loadProfile()
   }, [])
+
+  const checkVenueManager = async () => {
+    try {
+      const response = await fetch('/api/venue-manager/venues')
+      if (response.ok) {
+        const data = await response.json()
+        setIsVenueManager(data.venues && data.venues.length > 0)
+      }
+    } catch (error) {
+      console.error('Error checking venue manager:', error)
+    }
+  }
 
   const loadProfile = async () => {
     try {
@@ -73,6 +87,28 @@ export default function Navigation({ user }: { user: User }) {
                 Dashboard
               </Link>
               <Link
+                href="/network"
+                className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
+                  isActive('/network')
+                    ? 'border-indigo-500 text-gray-900'
+                    : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                {isVenueManager ? 'Venue Network' : 'Network'}
+              </Link>
+              {isVenueManager && (
+                <Link
+                  href="/media-library"
+                  className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
+                    isActive('/media-library')
+                      ? 'border-indigo-500 text-gray-900'
+                      : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
+                  }`}
+                >
+                  Media Library
+                </Link>
+              )}
+              <Link
                 href="/profile"
                 className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
                   isActive('/profile')
@@ -81,36 +117,6 @@ export default function Navigation({ user }: { user: User }) {
                 }`}
               >
                 Profile
-              </Link>
-              <Link
-                href="/network"
-                className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
-                  isActive('/network')
-                    ? 'border-indigo-500 text-gray-900'
-                    : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
-                }`}
-              >
-                Network
-              </Link>
-              <Link
-                href="/gigs"
-                className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
-                  isActive('/gigs')
-                    ? 'border-indigo-500 text-gray-900'
-                    : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
-                }`}
-              >
-                Gigs
-              </Link>
-              <Link
-                href="/venues"
-                className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
-                  isActive('/venues')
-                    ? 'border-indigo-500 text-gray-900'
-                    : 'border-transparent text-gray-900 hover:border-gray-300 hover:text-gray-700'
-                }`}
-              >
-                Venues
               </Link>
               {isAdmin && (
                 <Link

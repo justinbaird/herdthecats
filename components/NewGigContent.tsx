@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { INSTRUMENTS, type Instrument } from '@/lib/supabase/types'
 import Navigation from './Navigation'
 
-export default function NewGigContent({ user, initialVenueId, initialDate }: { user: User; initialVenueId?: string; initialDate?: string }) {
+export default function NewGigContent({ user, initialVenueId, initialDate, initialEntryType }: { user: User; initialVenueId?: string; initialDate?: string; initialEntryType?: 'gig' | 'rehearsal' }) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -23,6 +23,12 @@ export default function NewGigContent({ user, initialVenueId, initialDate }: { u
   const [numberOfSets, setNumberOfSets] = useState('')
   const [venueId, setVenueId] = useState<string | null>(initialVenueId || null)
   const [managedVenues, setManagedVenues] = useState<any[]>([])
+  const [entryType, setEntryType] = useState<'gig' | 'rehearsal'>(initialEntryType || 'gig')
+  const [musicChartsUrl, setMusicChartsUrl] = useState('')
+  const [leadMusicianId, setLeadMusicianId] = useState<string | null>(null)
+  const [leadMusicianSearch, setLeadMusicianSearch] = useState('')
+  const [leadMusicianResults, setLeadMusicianResults] = useState<any[]>([])
+  const [searchingLeadMusician, setSearchingLeadMusician] = useState(false)
   // Slots: array of { instruments: Instrument[], inviteOnly: boolean, payment: string }
   const [slots, setSlots] = useState<Array<{ instruments: Instrument[], inviteOnly: boolean, payment: string }>>([{ instruments: [], inviteOnly: false, payment: '' }])
 
@@ -48,6 +54,43 @@ export default function NewGigContent({ user, initialVenueId, initialDate }: { u
     }
     loadManagedVenues()
   }, [])
+
+  // Search for lead musician (from venue network if venue is selected)
+  const searchLeadMusician = async () => {
+    if (!leadMusicianSearch.trim() || !venueId) return
+
+    setSearchingLeadMusician(true)
+    try {
+      // First try to get from venue network
+      const networkResponse = await fetch(`/api/venues/${venueId}/network`)
+      const { network } = await networkResponse.json()
+
+      if (network && network.length > 0) {
+        const query = leadMusicianSearch.toLowerCase()
+        const filtered = network.filter((member: any) => {
+          const name = member.musician?.name?.toLowerCase() || ''
+          const email = member.musician?.email?.toLowerCase() || ''
+          return name.includes(query) || email.includes(query)
+        })
+        setLeadMusicianResults(filtered.map((m: any) => ({
+          ...m.musician,
+          user_id: m.musician_id,
+        })))
+      } else {
+        // Fallback to general musician search
+        const { data: musicians } = await supabase
+          .from('musicians')
+          .select('*')
+          .or(`name.ilike.%${leadMusicianSearch}%,email.ilike.%${leadMusicianSearch}%`)
+          .limit(10)
+        setLeadMusicianResults(musicians || [])
+      }
+    } catch (error) {
+      console.error('Error searching lead musician:', error)
+    } finally {
+      setSearchingLeadMusician(false)
+    }
+  }
 
   // Slot management functions
   const addSlot = () => {
@@ -181,8 +224,11 @@ export default function NewGigContent({ user, initialVenueId, initialDate }: { u
           required_instruments: uniqueInstruments, // Backwards compatibility
           instrument_slots: instrumentSlots,
           invite_only_slots: inviteOnlySlots,
-          payment_per_slot: paymentPerSlot,
+          payment_per_slot: entryType === 'gig' ? paymentPerSlot : [], // Only for gigs
+          entry_type: entryType,
+          music_charts_url: entryType === 'rehearsal' ? (musicChartsUrl || null) : null,
           venue_id: venueId || null,
+          lead_musician_id: leadMusicianId || null,
         })
         .select()
         .single()
@@ -226,9 +272,9 @@ export default function NewGigContent({ user, initialVenueId, initialDate }: { u
       <main className="mx-auto max-w-4xl py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">Post a New Gig</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Post a New Entry</h2>
             <p className="mt-2 text-sm text-gray-900">
-              Create a new gig. It will be visible to all users, and your network members will be notified.
+              Create a new gig or rehearsal. It will be visible to all users, and your network members will be notified.
             </p>
           </div>
 
@@ -240,12 +286,48 @@ export default function NewGigContent({ user, initialVenueId, initialDate }: { u
             )}
 
             <div className="space-y-6">
+              {/* Entry Type Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Entry Type *
+                </label>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="type-gig"
+                      name="entry-type"
+                      value="gig"
+                      checked={entryType === 'gig'}
+                      onChange={() => setEntryType('gig')}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor="type-gig" className="ml-2 text-sm text-gray-900">Gig (Paid)</label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="type-rehearsal"
+                      name="entry-type"
+                      value="rehearsal"
+                      checked={entryType === 'rehearsal'}
+                      onChange={() => setEntryType('rehearsal')}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor="type-rehearsal" className="ml-2 text-sm text-gray-900">Rehearsal (Unpaid)</label>
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-gray-900">
+                  Gigs are paid performances. Rehearsals are unpaid practice sessions.
+                </p>
+              </div>
+
               <div>
                 <label
                   htmlFor="title"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  Gig Title *
+                  {entryType === 'rehearsal' ? 'Rehearsal' : 'Gig'} Title *
                 </label>
                 <input
                   type="text"
@@ -254,7 +336,7 @@ export default function NewGigContent({ user, initialVenueId, initialDate }: { u
                   onChange={(e) => setTitle(e.target.value)}
                   required
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                  placeholder="e.g., Jazz Night at The Blue Note"
+                  placeholder={entryType === 'rehearsal' ? 'e.g., Rehearsal for Jazz Night' : 'e.g., Jazz Night at The Blue Note'}
                 />
               </div>
 
@@ -280,7 +362,105 @@ export default function NewGigContent({ user, initialVenueId, initialDate }: { u
                     ))}
                   </select>
                   <p className="mt-1 text-xs text-gray-900">
-                    Select a venue to post this gig on the venue calendar. Only venues you manage are shown.
+                    Select a venue to post this {entryType === 'rehearsal' ? 'rehearsal' : 'gig'} on the venue calendar. Only venues you manage are shown.
+                  </p>
+                </div>
+              )}
+
+              {/* Lead Musician Selection - only for venue gigs */}
+              {venueId && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Lead Musician (Optional)
+                  </label>
+                  <p className="mt-1 text-xs text-gray-900 mb-2">
+                    Select a lead musician to manage musician slots. Once they accept, they'll have full control over configuring slots.
+                  </p>
+                  {leadMusicianId ? (
+                    <div className="flex items-center justify-between rounded-md border border-gray-300 bg-gray-50 p-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {leadMusicianResults.find(m => m.user_id === leadMusicianId)?.name || 'Selected musician'}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {leadMusicianResults.find(m => m.user_id === leadMusicianId)?.email || ''}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLeadMusicianId(null)
+                          setLeadMusicianResults([])
+                          setLeadMusicianSearch('')
+                        }}
+                        className="text-sm text-red-600 hover:text-red-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={leadMusicianSearch}
+                          onChange={(e) => setLeadMusicianSearch(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchLeadMusician())}
+                          placeholder="Search by name or email..."
+                          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={searchLeadMusician}
+                          disabled={searchingLeadMusician || !leadMusicianSearch.trim()}
+                          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                        >
+                          {searchingLeadMusician ? 'Searching...' : 'Search'}
+                        </button>
+                      </div>
+                      {leadMusicianResults.length > 0 && (
+                        <div className="mt-2 space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-md">
+                          {leadMusicianResults.map((musician) => (
+                            <button
+                              key={musician.user_id}
+                              type="button"
+                              onClick={() => {
+                                setLeadMusicianId(musician.user_id)
+                                setLeadMusicianResults([])
+                                setLeadMusicianSearch('')
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-indigo-50 text-sm"
+                            >
+                              <p className="font-medium text-gray-900">{musician.name}</p>
+                              <p className="text-xs text-gray-600">{musician.email}</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Music Charts URL for Rehearsals */}
+              {entryType === 'rehearsal' && (
+                <div>
+                  <label
+                    htmlFor="musicChartsUrl"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Music Charts URL
+                  </label>
+                  <input
+                    type="url"
+                    id="musicChartsUrl"
+                    value={musicChartsUrl}
+                    onChange={(e) => setMusicChartsUrl(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                    placeholder="https://drive.google.com/... or https://dropbox.com/..."
+                  />
+                  <p className="mt-1 text-xs text-gray-900">
+                    Optional: Link to music charts (Google Drive, Dropbox, etc.)
                   </p>
                 </div>
               )}
@@ -478,20 +658,22 @@ export default function NewGigContent({ user, initialVenueId, initialDate }: { u
                             Invite Only
                           </span>
                         </label>
-                        <div className="flex-1 max-w-xs">
-                          <label className="block text-xs text-gray-900 mb-1">
-                            Payment ($):
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={slot.payment}
-                            onChange={(e) => setPaymentForSlot(slotIndex, e.target.value)}
-                            placeholder="Optional"
-                            className="block w-full rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                          />
-                        </div>
+                        {entryType === 'gig' && (
+                          <div className="flex-1 max-w-xs">
+                            <label className="block text-xs text-gray-900 mb-1">
+                              Payment ($):
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={slot.payment}
+                              onChange={(e) => setPaymentForSlot(slotIndex, e.target.value)}
+                              placeholder="Optional"
+                              className="block w-full rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -510,7 +692,7 @@ export default function NewGigContent({ user, initialVenueId, initialDate }: { u
                   disabled={loading || slots.filter(slot => slot.instruments.length > 0).length === 0}
                   className="rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
                 >
-                  {loading ? 'Posting...' : 'Post Gig'}
+                  {loading ? 'Posting...' : entryType === 'rehearsal' ? 'Post Rehearsal' : 'Post Gig'}
                 </button>
               </div>
             </div>

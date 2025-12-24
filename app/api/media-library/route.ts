@@ -1,0 +1,109 @@
+import { NextResponse } from 'next/server'
+import { createClient as createServerClient } from '@/lib/supabase/server'
+
+// GET /api/media-library - Get all media with gig details, searchable
+export async function GET(request: Request) {
+  try {
+    const supabase = await createServerClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check if user is a venue manager
+    const { data: managerVenues } = await supabase
+      .from('venue_managers')
+      .select('venue_id')
+      .eq('user_id', user.id)
+
+    if (!managerVenues || managerVenues.length === 0) {
+      return NextResponse.json(
+        { error: 'Only venue managers can access the media library' },
+        { status: 403 }
+      )
+    }
+
+    const { searchParams } = new URL(request.url)
+    const search = searchParams.get('search') || ''
+
+    // Get all gigs for venues this manager manages
+    const venueIds = managerVenues.map((mv) => mv.venue_id)
+    const { data: gigs, error: gigsError } = await supabase
+      .from('gigs')
+      .select('id, title, entry_type')
+      .in('venue_id', venueIds)
+
+    if (gigsError) throw gigsError
+
+    const gigIds = gigs?.map((g) => g.id) || []
+
+    if (gigIds.length === 0) {
+      return NextResponse.json({ media: [], descriptions: [] })
+    }
+
+    // Get all media for these gigs
+    let mediaQuery = supabase
+      .from('gig_media')
+      .select('*')
+      .in('gig_id', gigIds)
+      .order('created_at', { ascending: false })
+
+    if (search) {
+      mediaQuery = mediaQuery.or(`description.ilike.%${search}%,file_name.ilike.%${search}%`)
+    }
+
+    const { data: media, error: mediaError } = await mediaQuery
+
+    if (mediaError) throw mediaError
+
+    // Get all descriptions for these gigs
+    let descriptionsQuery = supabase
+      .from('gig_descriptions')
+      .select('*')
+      .in('gig_id', gigIds)
+      .order('created_at', { ascending: false })
+
+    if (search) {
+      descriptionsQuery = descriptionsQuery.ilike('description', `%${search}%`)
+    }
+
+    const { data: descriptions, error: descError } = await descriptionsQuery
+
+    if (descError) throw descError
+
+    // Combine with gig details
+    const mediaWithGigs = media?.map((m) => {
+      const gig = gigs?.find((g) => g.id === m.gig_id)
+      return {
+        ...m,
+        gig_title: gig?.title || 'Unknown',
+        gig_entry_type: gig?.entry_type || 'gig',
+      }
+    }) || []
+
+    const descriptionsWithGigs = descriptions?.map((d) => {
+      const gig = gigs?.find((g) => g.id === d.gig_id)
+      return {
+        ...d,
+        gig_title: gig?.title || 'Unknown',
+        gig_entry_type: gig?.entry_type || 'gig',
+      }
+    }) || []
+
+    return NextResponse.json({
+      media: mediaWithGigs,
+      descriptions: descriptionsWithGigs,
+    })
+  } catch (error: any) {
+    console.error('Error fetching media library:', error)
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+

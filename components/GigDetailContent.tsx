@@ -30,6 +30,15 @@ export default function GigDetailContent({
   const [inviteSearchName, setInviteSearchName] = useState('')
   const [inviteSearchResults, setInviteSearchResults] = useState<any[]>([])
   const [inviting, setInviting] = useState(false)
+  const [myDescription, setMyDescription] = useState<string | null>(null)
+  const [descriptionText, setDescriptionText] = useState('')
+  const [savingDescription, setSavingDescription] = useState(false)
+  const [media, setMedia] = useState<any[]>([])
+  const [uploadingMedia, setUploadingMedia] = useState(false)
+  const [mediaUrl, setMediaUrl] = useState('')
+  const [mediaType, setMediaType] = useState<'photo' | 'video'>('photo')
+  const [mediaDescription, setMediaDescription] = useState('')
+  const [hasGigAccess, setHasGigAccess] = useState(false)
 
   useEffect(() => {
     loadGig()
@@ -118,6 +127,53 @@ export default function GigDetailContent({
         setInvitations(invitesWithMusicians)
       } else {
         setInvitations([])
+      }
+
+      // Check if user has access to this gig (for venue gigs)
+      if (gigData.venue_id) {
+        const { data: access } = await supabase
+          .from('venue_gig_access')
+          .select('id')
+          .eq('gig_id', gigId)
+          .eq('musician_id', user.id)
+          .maybeSingle()
+
+        const { data: manager } = await supabase
+          .from('venue_managers')
+          .select('id')
+          .eq('venue_id', gigData.venue_id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        setHasGigAccess(!!(access || manager || gigData.posted_by === user.id))
+      } else {
+        // Non-venue gigs are accessible to all
+        setHasGigAccess(true)
+      }
+
+      // Load my description
+      try {
+        const descResponse = await fetch(`/api/gigs/${gigId}/description`)
+        if (descResponse.ok) {
+          const descData = await descResponse.json()
+          if (descData.description) {
+            setMyDescription(descData.description.id)
+            setDescriptionText(descData.description.description)
+          }
+        }
+      } catch (err) {
+        console.error('Error loading description:', err)
+      }
+
+      // Load media
+      try {
+        const mediaResponse = await fetch(`/api/gigs/${gigId}/media`)
+        if (mediaResponse.ok) {
+          const mediaData = await mediaResponse.json()
+          setMedia(mediaData.media || [])
+        }
+      } catch (err) {
+        console.error('Error loading media:', err)
       }
     } catch (error: any) {
       console.error('Error loading gig:', error)
@@ -897,6 +953,184 @@ export default function GigDetailContent({
                 })}
               </div>
             </div>
+
+            {/* Musician Description Section - Only for venue gigs with access */}
+            {gig.venue_id && hasGigAccess && (
+              <div className="mt-8 rounded-lg bg-white p-6 shadow">
+                <h2 className="mb-4 text-xl font-semibold text-gray-900">
+                  Your Description
+                </h2>
+                <p className="mb-4 text-sm text-gray-900">
+                  Add a text description about this gig for the venue manager to share with marketing.
+                </p>
+                <textarea
+                  value={descriptionText}
+                  onChange={(e) => setDescriptionText(e.target.value)}
+                  rows={4}
+                  placeholder="Describe your experience, the music, the audience, or any other details..."
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                />
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={async () => {
+                      setSavingDescription(true)
+                      try {
+                        const response = await fetch(`/api/gigs/${gigId}/description`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ description: descriptionText }),
+                        })
+                        const data = await response.json()
+                        if (!response.ok) throw new Error(data.error)
+                        setSuccess('Description saved successfully!')
+                        setTimeout(() => setSuccess(null), 3000)
+                      } catch (err: any) {
+                        setError(err.message || 'Failed to save description')
+                      } finally {
+                        setSavingDescription(false)
+                      }
+                    }}
+                    disabled={savingDescription}
+                    className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                  >
+                    {savingDescription ? 'Saving...' : myDescription ? 'Update Description' : 'Save Description'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Media Upload Section - Only for venue gigs with access */}
+            {gig.venue_id && hasGigAccess && (
+              <div className="mt-8 rounded-lg bg-white p-6 shadow">
+                <h2 className="mb-4 text-xl font-semibold text-gray-900">
+                  Upload Media
+                </h2>
+                <p className="mb-4 text-sm text-gray-900">
+                  Upload photos or videos from this gig for the venue manager to share with marketing.
+                </p>
+
+                {/* Existing Media */}
+                {media.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="mb-3 text-sm font-medium text-gray-900">Uploaded Media:</h3>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {media.map((item) => (
+                        <div key={item.id} className="rounded-lg border border-gray-200 p-3">
+                          {item.media_type === 'photo' ? (
+                            <img
+                              src={item.file_url}
+                              alt={item.file_name || 'Photo'}
+                              className="w-full h-48 object-cover rounded-lg mb-2"
+                            />
+                          ) : (
+                            <video
+                              src={item.file_url}
+                              controls
+                              className="w-full h-48 object-cover rounded-lg mb-2"
+                            >
+                              Your browser does not support the video tag.
+                            </video>
+                          )}
+                          {item.description && (
+                            <p className="text-xs text-gray-600 mb-1">{item.description}</p>
+                          )}
+                          <p className="text-xs text-gray-500">
+                            {format(new Date(item.created_at), 'PPp')}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload Form */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Media Type
+                    </label>
+                    <select
+                      value={mediaType}
+                      onChange={(e) => setMediaType(e.target.value as 'photo' | 'video')}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                    >
+                      <option value="photo">Photo</option>
+                      <option value="video">Video</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Media URL *
+                    </label>
+                    <input
+                      type="url"
+                      value={mediaUrl}
+                      onChange={(e) => setMediaUrl(e.target.value)}
+                      placeholder="https://example.com/image.jpg or https://example.com/video.mp4"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-600">
+                      Paste a URL to an image or video hosted online (e.g., Imgur, YouTube, Google Drive, Dropbox)
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Description (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={mediaDescription}
+                      onChange={(e) => setMediaDescription(e.target.value)}
+                      placeholder="Brief description of this media..."
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={async () => {
+                        if (!mediaUrl.trim()) {
+                          setError('Please provide a media URL')
+                          return
+                        }
+                        setUploadingMedia(true)
+                        setError(null)
+                        try {
+                          const response = await fetch(`/api/gigs/${gigId}/media`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              file_url: mediaUrl.trim(),
+                              media_type: mediaType,
+                              description: mediaDescription.trim() || null,
+                            }),
+                          })
+                          const data = await response.json()
+                          if (!response.ok) throw new Error(data.error)
+                          setSuccess('Media uploaded successfully!')
+                          setTimeout(() => setSuccess(null), 3000)
+                          setMediaUrl('')
+                          setMediaDescription('')
+                          // Reload media
+                          const mediaResponse = await fetch(`/api/gigs/${gigId}/media`)
+                          if (mediaResponse.ok) {
+                            const mediaData = await mediaResponse.json()
+                            setMedia(mediaData.media || [])
+                          }
+                        } catch (err: any) {
+                          setError(err.message || 'Failed to upload media')
+                        } finally {
+                          setUploadingMedia(false)
+                        }
+                      }}
+                      disabled={uploadingMedia || !mediaUrl.trim()}
+                      className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                    >
+                      {uploadingMedia ? 'Uploading...' : 'Upload Media'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
