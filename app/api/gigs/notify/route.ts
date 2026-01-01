@@ -12,7 +12,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { gigId } = await request.json()
+    const { gigId, leadMusicianId } = await request.json()
+
+    // Only notify if leadMusicianId is provided
+    if (!leadMusicianId) {
+      return NextResponse.json({
+        success: true,
+        notified: 0,
+        message: 'No lead musician specified, no notification sent.',
+      })
+    }
 
     // Get gig details
     const { data: gig, error: gigError } = await supabase
@@ -28,47 +37,38 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get network members
-    const { data: networkMembers, error: networkError } = await supabase
-      .from('networks')
-      .select('network_member_id')
-      .eq('user_id', gig.posted_by)
+    // Verify the leadMusicianId matches the gig's lead_musician_id
+    if (gig.lead_musician_id !== leadMusicianId) {
+      return NextResponse.json({
+        success: true,
+        notified: 0,
+        message: 'Lead musician ID does not match gig.',
+      })
+    }
 
-    if (networkError) {
+    // Get lead musician profile
+    const { data: leadMusician, error: musicianError } = await supabase
+      .from('musicians')
+      .select('*')
+      .eq('user_id', leadMusicianId)
+      .single()
+
+    if (musicianError || !leadMusician) {
       return NextResponse.json(
-        { error: networkError.message },
-        { status: 400 }
+        { error: 'Lead musician not found' },
+        { status: 404 }
       )
     }
 
-    // Get musician profiles for network members
-    let relevantMembers: any[] = []
-    if (networkMembers && networkMembers.length > 0) {
-      const memberUserIds = networkMembers.map((n) => n.network_member_id)
-      const { data: musicians, error: musiciansError } = await supabase
-        .from('musicians')
-        .select('*')
-        .in('user_id', memberUserIds)
-
-      if (!musiciansError && musicians) {
-        // For each network member, check if they play any required instruments
-        relevantMembers = musicians.filter((musician) => {
-          const memberInstruments = musician.instruments || []
-          return gig.required_instruments.some((inst: string) =>
-            memberInstruments.includes(inst)
-          )
-        })
-      }
-    }
-
-    // Send notifications (email notifications would be set up via Supabase Edge Functions or webhooks)
+    // Send notification to lead musician (email notifications would be set up via Supabase Edge Functions or webhooks)
     // For now, we'll just return success - actual email sending should be configured separately
 
     return NextResponse.json({
       success: true,
-      notified: relevantMembers?.length || 0,
+      notified: 1,
+      leadMusicianEmail: leadMusician.email,
       message:
-        'Gig notifications will be sent via email. Configure Supabase email templates or Edge Functions for actual email delivery.',
+        'Gig notification will be sent to lead musician via email. Configure Supabase email templates or Edge Functions for actual email delivery.',
     })
   } catch (error: any) {
     return NextResponse.json(

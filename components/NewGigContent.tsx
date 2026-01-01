@@ -18,9 +18,9 @@ export default function NewGigContent({ user, initialVenueId, initialDate, initi
   const [location, setLocation] = useState('')
   const [datetime, setDatetime] = useState('')
   const [callTime, setCallTime] = useState('')
-  const [startTime, setStartTime] = useState(initialDate ? `${initialDate}T12:00` : '')
+  const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
-  const [numberOfSets, setNumberOfSets] = useState('')
+  const [numberOfSets, setNumberOfSets] = useState('2 longer or 3 shorter sets')
   const [venueId, setVenueId] = useState<string | null>(initialVenueId || null)
   const [managedVenues, setManagedVenues] = useState<any[]>([])
   const [entryType, setEntryType] = useState<'gig' | 'rehearsal'>(initialEntryType || 'gig')
@@ -31,6 +31,22 @@ export default function NewGigContent({ user, initialVenueId, initialDate, initi
   const [searchingLeadMusician, setSearchingLeadMusician] = useState(false)
   // Slots: array of { instruments: Instrument[], inviteOnly: boolean, payment: string }
   const [slots, setSlots] = useState<Array<{ instruments: Instrument[], inviteOnly: boolean, payment: string }>>([{ instruments: [], inviteOnly: false, payment: '' }])
+
+  // Set default times when component mounts or date changes
+  useEffect(() => {
+    // Use initialDate if provided, otherwise use today's date
+    const dateStr = initialDate || new Date().toISOString().split('T')[0]
+    
+    // Set default times
+    // Start time: 8:30 PM (20:30)
+    setStartTime(`${dateStr}T20:30`)
+    // Call time: 7:30 PM (19:30) - 1 hour earlier
+    setCallTime(`${dateStr}T19:30`)
+    // End time: 11:00 PM (23:00)
+    setEndTime(`${dateStr}T23:00`)
+    // Also set datetime for backwards compatibility
+    setDatetime(`${dateStr}T20:30`)
+  }, [initialDate])
 
   // Load managed venues on mount
   useEffect(() => {
@@ -220,7 +236,7 @@ export default function NewGigContent({ user, initialVenueId, initialDate, initi
           call_time: isoCallTime,
           start_time: isoStartTime,
           end_time: isoEndTime,
-          number_of_sets: numberOfSets ? parseInt(numberOfSets, 10) : null,
+          number_of_sets: numberOfSets && numberOfSets.trim() ? numberOfSets.trim() : null,
           required_instruments: uniqueInstruments, // Backwards compatibility
           instrument_slots: instrumentSlots,
           invite_only_slots: inviteOnlySlots,
@@ -235,20 +251,19 @@ export default function NewGigContent({ user, initialVenueId, initialDate, initi
 
       if (error) throw error
 
-      // Broadcast to network - trigger notifications ONLY if not a venue gig
-      // Venue gigs use venue networks instead, which are managed separately
-      if (!venueId) {
+      // Notify lead musician only if one is selected
+      if (leadMusicianId) {
         try {
           await fetch('/api/gigs/notify', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ gigId: data.id }),
+            body: JSON.stringify({ gigId: data.id, leadMusicianId }),
           })
         } catch (notifyError) {
           // Don't fail the gig creation if notification fails
-          console.error('Failed to send notifications:', notifyError)
+          console.error('Failed to send notification:', notifyError)
         }
       }
 
@@ -566,16 +581,15 @@ export default function NewGigContent({ user, initialVenueId, initialDate, initi
                   Number of Sets
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   id="number-of-sets"
                   value={numberOfSets}
                   onChange={(e) => setNumberOfSets(e.target.value)}
-                  min="1"
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-                  placeholder="e.g., 2"
+                  placeholder="2 longer or 3 shorter sets"
                 />
                 <p className="mt-1 text-xs text-gray-900">
-                  Optional: How many sets will be performed
+                  Optional: Describe the number and length of sets
                 </p>
               </div>
 
