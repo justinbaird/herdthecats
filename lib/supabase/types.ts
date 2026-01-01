@@ -91,6 +91,7 @@ export interface Venue {
   phone?: string | null
   email?: string | null
   website?: string | null
+  public_calendar_hash?: string | null
   created_at: string
   updated_at: string
 }

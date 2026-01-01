@@ -11,15 +11,19 @@ export default function AdminContent({ user }: { user: User }) {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<any[]>([])
+  const [venues, setVenues] = useState<any[]>([])
+  const [selectedVenueId, setSelectedVenueId] = useState<string>('')
   const [searchEmail, setSearchEmail] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
+  const [copyingLink, setCopyingLink] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [selectedUser, setSelectedUser] = useState<any>(null)
 
   useEffect(() => {
     loadUsers()
+    loadVenues()
   }, [])
 
   const loadUsers = async () => {
@@ -38,6 +42,52 @@ export default function AdminContent({ user }: { user: User }) {
       setError(error.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadVenues = async () => {
+    try {
+      const response = await fetch('/api/venues')
+      const { venues: venuesData, error: venuesError } = await response.json()
+      
+      if (venuesError) throw new Error(venuesError)
+      
+      setVenues(venuesData || [])
+      if (venuesData && venuesData.length > 0) {
+        setSelectedVenueId(venuesData[0].id)
+      }
+    } catch (error: any) {
+      console.error('Error loading venues:', error)
+    }
+  }
+
+  const handleCopyPublicCalendarLink = async () => {
+    if (!selectedVenueId) {
+      setError('Please select a venue')
+      return
+    }
+
+    setCopyingLink(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch(`/api/venues/${selectedVenueId}/public-calendar-link`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get public calendar link')
+      }
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(data.publicLink)
+      setSuccess('Public calendar link copied to clipboard!')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (error: any) {
+      console.error('Error copying public calendar link:', error)
+      setError(error.message)
+    } finally {
+      setCopyingLink(false)
     }
   }
 
@@ -179,11 +229,37 @@ export default function AdminContent({ user }: { user: User }) {
 
       <main className="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
-            <p className="mt-2 text-sm text-gray-900">
-              Manage users, invitations, and community settings.
-            </p>
+          <div className="mb-8 flex items-start justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
+              <p className="mt-2 text-sm text-gray-900">
+                Manage users, invitations, and community settings.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {venues.length > 0 && (
+                <>
+                  <select
+                    value={selectedVenueId}
+                    onChange={(e) => setSelectedVenueId(e.target.value)}
+                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                  >
+                    {venues.map((venue) => (
+                      <option key={venue.id} value={venue.id}>
+                        {venue.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleCopyPublicCalendarLink}
+                    disabled={copyingLink || !selectedVenueId}
+                    className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                  >
+                    {copyingLink ? 'Copying...' : 'Copy Public Calendar Link'}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {error && (
