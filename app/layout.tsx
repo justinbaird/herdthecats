@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Herd the Cats - Musician Network",
+  title: "Herd the Cats - Music Venue Network",
   description: "Connect with musicians and manage your gigs",
 };
 
