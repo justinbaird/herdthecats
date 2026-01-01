@@ -14,6 +14,7 @@ export default function MediaLibraryContent({ user }: { user: User }) {
   const [descriptions, setDescriptions] = useState<(GigDescription & { gig_title: string; gig_entry_type: string })[]>([])
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [uploadingMedia, setUploadingMedia] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [mediaType, setMediaType] = useState<'photo' | 'video'>('photo')
