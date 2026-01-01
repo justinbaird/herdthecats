@@ -80,3 +80,4 @@ CREATE POLICY "Gig posters and lead musicians can update applications"
   );
 
 
+

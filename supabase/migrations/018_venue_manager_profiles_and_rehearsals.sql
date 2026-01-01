@@ -240,3 +240,4 @@ COMMENT ON TABLE gig_media IS 'Photos and videos uploaded by musicians for gigs'
 COMMENT ON TABLE gig_descriptions IS 'Text descriptions added by musicians for gigs';
 
 
+

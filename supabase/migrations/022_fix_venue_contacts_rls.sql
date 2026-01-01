@@ -37,3 +37,4 @@ CREATE POLICY "Venue managers can delete contacts"
     OR is_admin()
   );
 
+

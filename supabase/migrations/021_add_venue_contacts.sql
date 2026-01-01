@@ -74,3 +74,4 @@ CREATE POLICY "Venue managers can delete contacts"
   );
 
 
+

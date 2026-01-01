@@ -19,6 +19,7 @@ export default function EditGigContent({
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -227,6 +228,32 @@ export default function EditGigContent({
       console.error('Error updating gig:', error)
       setError(error.message)
       setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this gig? This action cannot be undone.')) {
+      return
+    }
+
+    setError(null)
+    setDeleting(true)
+
+    try {
+      const response = await fetch(`/api/gigs/${gigId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete gig')
+      }
+
+      router.push('/gigs')
+    } catch (error: any) {
+      console.error('Error deleting gig:', error)
+      setError(error.message)
+      setDeleting(false)
     }
   }
 
@@ -461,6 +488,14 @@ export default function EditGigContent({
               </div>
 
               <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting || saving}
+                  className="rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Delete Gig'}
+                </button>
                 <Link
                   href={`/gigs/${gigId}`}
                   className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
@@ -469,7 +504,7 @@ export default function EditGigContent({
                 </Link>
                 <button
                   type="submit"
-                  disabled={saving || requiredInstruments.length === 0}
+                  disabled={saving || deleting || requiredInstruments.length === 0}
                   className="rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save Changes'}
