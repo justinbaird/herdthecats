@@ -166,7 +166,7 @@ export interface VenueManagerInvitation {
 
 export interface GigMedia {
   id: string
-  gig_id: string
+  gig_id: string | null // null for library-only media
   uploaded_by: string
   media_type: 'photo' | 'video'
   file_url: string

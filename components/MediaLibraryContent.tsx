@@ -20,28 +20,9 @@ export default function MediaLibraryContent({ user }: { user: User }) {
   const [mediaType, setMediaType] = useState<'photo' | 'video'>('photo')
   const [mediaDescription, setMediaDescription] = useState('')
   const [showUploadForm, setShowUploadForm] = useState(false)
-  const [availableGigs, setAvailableGigs] = useState<any[]>([])
-  const [selectedGigId, setSelectedGigId] = useState<string>('')
-
   useEffect(() => {
     loadMediaLibrary()
-    loadAvailableGigs()
   }, [])
-
-  const loadAvailableGigs = async () => {
-    try {
-      const response = await fetch('/api/media-library/gigs')
-      if (response.ok) {
-        const data = await response.json()
-        setAvailableGigs(data.gigs || [])
-        if (data.gigs && data.gigs.length > 0) {
-          setSelectedGigId(data.gigs[0].id)
-        }
-      }
-    } catch (err) {
-      console.error('Error loading gigs:', err)
-    }
-  }
 
   useEffect(() => {
     // Debounce search
@@ -113,25 +94,11 @@ export default function MediaLibraryContent({ user }: { user: User }) {
           {/* Upload Form */}
           {showUploadForm && (
             <div className="mb-6 rounded-lg bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Upload Media</h3>
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">Upload Media to Library</h3>
+              <p className="mb-4 text-sm text-gray-600">
+                Upload media to your library. You can then add it to any gig from the gig detail page.
+              </p>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Select Gig *
-                  </label>
-                  <select
-                    value={selectedGigId}
-                    onChange={(e) => setSelectedGigId(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                  >
-                    <option value="">Select a gig...</option>
-                    {availableGigs.map((gig) => (
-                      <option key={gig.id} value={gig.id}>
-                        {gig.title} ({gig.entry_type === 'rehearsal' ? 'Rehearsal' : 'Gig'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">
                     Media Type
@@ -188,10 +155,6 @@ export default function MediaLibraryContent({ user }: { user: User }) {
                         setError('Please select a file to upload')
                         return
                       }
-                      if (!selectedGigId) {
-                        setError('Please select a gig')
-                        return
-                      }
                       setUploadingMedia(true)
                       setError(null)
                       try {
@@ -207,8 +170,8 @@ export default function MediaLibraryContent({ user }: { user: User }) {
                         const uploadData = await uploadResponse.json()
                         if (!uploadResponse.ok) throw new Error(uploadData.error)
 
-                        // Add to gig
-                        const response = await fetch(`/api/gigs/${selectedGigId}/media`, {
+                        // Add to library (gig_id = null)
+                        const response = await fetch('/api/media-library/upload', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
@@ -222,7 +185,7 @@ export default function MediaLibraryContent({ user }: { user: User }) {
                         const data = await response.json()
                         if (!response.ok) throw new Error(data.error)
 
-                        setSuccess('Media uploaded successfully!')
+                        setSuccess('Media uploaded to library successfully!')
                         setTimeout(() => setSuccess(null), 3000)
                         setSelectedFile(null)
                         setMediaDescription('')
@@ -234,10 +197,10 @@ export default function MediaLibraryContent({ user }: { user: User }) {
                         setUploadingMedia(false)
                       }
                     }}
-                    disabled={uploadingMedia || !selectedFile || !selectedGigId}
+                    disabled={uploadingMedia || !selectedFile}
                     className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
                   >
-                    {uploadingMedia ? 'Uploading...' : 'Upload'}
+                    {uploadingMedia ? 'Uploading...' : 'Upload to Library'}
                   </button>
                 </div>
               </div>
