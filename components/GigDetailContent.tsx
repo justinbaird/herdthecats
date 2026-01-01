@@ -35,14 +35,37 @@ export default function GigDetailContent({
   const [savingDescription, setSavingDescription] = useState(false)
   const [media, setMedia] = useState<any[]>([])
   const [uploadingMedia, setUploadingMedia] = useState(false)
-  const [mediaUrl, setMediaUrl] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [mediaType, setMediaType] = useState<'photo' | 'video'>('photo')
   const [mediaDescription, setMediaDescription] = useState('')
   const [hasGigAccess, setHasGigAccess] = useState(false)
+  const [showMediaLibrary, setShowMediaLibrary] = useState(false)
+  const [libraryMedia, setLibraryMedia] = useState<any[]>([])
+  const [loadingLibrary, setLoadingLibrary] = useState(false)
 
   useEffect(() => {
     loadGig()
   }, [gigId])
+
+  const loadMediaLibrary = async () => {
+    if (!showMediaLibrary) return
+    setLoadingLibrary(true)
+    try {
+      const response = await fetch('/api/media-library')
+      if (response.ok) {
+        const data = await response.json()
+        setLibraryMedia(data.media || [])
+      }
+    } catch (err) {
+      console.error('Error loading media library:', err)
+    } finally {
+      setLoadingLibrary(false)
+    }
+  }
+
+  useEffect(() => {
+    loadMediaLibrary()
+  }, [showMediaLibrary])
 
   const loadGig = async () => {
     try {
@@ -1045,13 +1068,91 @@ export default function GigDetailContent({
 
                 {/* Upload Form */}
                 <div className="space-y-4">
+                  <div className="flex gap-3 mb-4">
+                    <button
+                      onClick={() => setShowMediaLibrary(!showMediaLibrary)}
+                      className="rounded-md border border-indigo-600 bg-white px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+                    >
+                      {showMediaLibrary ? 'Hide' : 'Browse'} Media Library
+                    </button>
+                  </div>
+
+                  {showMediaLibrary && (
+                    <div className="mb-6 rounded-lg border border-gray-300 bg-gray-50 p-4">
+                      <h3 className="mb-3 text-sm font-medium text-gray-900">Select from Media Library</h3>
+                      {loadingLibrary ? (
+                        <p className="text-sm text-gray-600">Loading...</p>
+                      ) : libraryMedia.length === 0 ? (
+                        <p className="text-sm text-gray-600">No media in library yet.</p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+                          {libraryMedia.map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={async () => {
+                                try {
+                                  setUploadingMedia(true)
+                                  setError(null)
+                                  const response = await fetch(`/api/gigs/${gigId}/media`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      file_url: item.file_url,
+                                      file_name: item.file_name,
+                                      file_size: item.file_size,
+                                      media_type: item.media_type,
+                                      description: item.description || null,
+                                    }),
+                                  })
+                                  const data = await response.json()
+                                  if (!response.ok) throw new Error(data.error)
+                                  setSuccess('Media added successfully!')
+                                  setTimeout(() => setSuccess(null), 3000)
+                                  setShowMediaLibrary(false)
+                                  // Reload media
+                                  const mediaResponse = await fetch(`/api/gigs/${gigId}/media`)
+                                  if (mediaResponse.ok) {
+                                    const mediaData = await mediaResponse.json()
+                                    setMedia(mediaData.media || [])
+                                  }
+                                } catch (err: any) {
+                                  setError(err.message || 'Failed to add media')
+                                } finally {
+                                  setUploadingMedia(false)
+                                }
+                              }}
+                              className="text-left rounded border border-gray-200 bg-white p-2 hover:border-indigo-500 hover:bg-indigo-50"
+                            >
+                              {item.media_type === 'photo' ? (
+                                <img
+                                  src={item.file_url}
+                                  alt={item.file_name || 'Photo'}
+                                  className="w-full h-24 object-cover rounded mb-1"
+                                />
+                              ) : (
+                                <video
+                                  src={item.file_url}
+                                  className="w-full h-24 object-cover rounded mb-1"
+                                />
+                              )}
+                              <p className="text-xs text-gray-600 truncate">{item.file_name || 'Media'}</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">
                       Media Type
                     </label>
                     <select
                       value={mediaType}
-                      onChange={(e) => setMediaType(e.target.value as 'photo' | 'video')}
+                      onChange={(e) => {
+                        setMediaType(e.target.value as 'photo' | 'video')
+                        setSelectedFile(null)
+                      }}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
                     >
                       <option value="photo">Photo</option>
@@ -1060,18 +1161,24 @@ export default function GigDetailContent({
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Media URL *
+                      Upload File *
                     </label>
                     <input
-                      type="url"
-                      value={mediaUrl}
-                      onChange={(e) => setMediaUrl(e.target.value)}
-                      placeholder="https://example.com/image.jpg or https://example.com/video.mp4"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                      type="file"
+                      accept={mediaType === 'photo' ? 'image/*' : 'video/*'}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setSelectedFile(file)
+                        }
+                      }}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
                     />
-                    <p className="mt-1 text-xs text-gray-600">
-                      Paste a URL to an image or video hosted online (e.g., Imgur, YouTube, Google Drive, Dropbox)
-                    </p>
+                    {selectedFile && (
+                      <p className="mt-1 text-xs text-gray-600">
+                        Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">
@@ -1088,19 +1195,34 @@ export default function GigDetailContent({
                   <div className="flex justify-end">
                     <button
                       onClick={async () => {
-                        if (!mediaUrl.trim()) {
-                          setError('Please provide a media URL')
+                        if (!selectedFile) {
+                          setError('Please select a file to upload')
                           return
                         }
                         setUploadingMedia(true)
                         setError(null)
                         try {
+                          // First upload the file
+                          const uploadFormData = new FormData()
+                          uploadFormData.append('file', selectedFile)
+                          uploadFormData.append('mediaType', mediaType)
+
+                          const uploadResponse = await fetch('/api/media/upload', {
+                            method: 'POST',
+                            body: uploadFormData,
+                          })
+                          const uploadData = await uploadResponse.json()
+                          if (!uploadResponse.ok) throw new Error(uploadData.error)
+
+                          // Then add to gig
                           const response = await fetch(`/api/gigs/${gigId}/media`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                              file_url: mediaUrl.trim(),
-                              media_type: mediaType,
+                              file_url: uploadData.file_url,
+                              file_name: uploadData.file_name,
+                              file_size: uploadData.file_size,
+                              media_type: uploadData.media_type,
                               description: mediaDescription.trim() || null,
                             }),
                           })
@@ -1108,7 +1230,7 @@ export default function GigDetailContent({
                           if (!response.ok) throw new Error(data.error)
                           setSuccess('Media uploaded successfully!')
                           setTimeout(() => setSuccess(null), 3000)
-                          setMediaUrl('')
+                          setSelectedFile(null)
                           setMediaDescription('')
                           // Reload media
                           const mediaResponse = await fetch(`/api/gigs/${gigId}/media`)
@@ -1122,7 +1244,7 @@ export default function GigDetailContent({
                           setUploadingMedia(false)
                         }
                       }}
-                      disabled={uploadingMedia || !mediaUrl.trim()}
+                      disabled={uploadingMedia || !selectedFile}
                       className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
                     >
                       {uploadingMedia ? 'Uploading...' : 'Upload Media'}
