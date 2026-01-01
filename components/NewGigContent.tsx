@@ -48,6 +48,27 @@ export default function NewGigContent({ user, initialVenueId, initialDate, initi
     setDatetime(`${dateStr}T20:30`)
   }, [initialDate])
 
+  // Auto-populate location when venue is selected
+  useEffect(() => {
+    if (venueId && managedVenues.length > 0) {
+      const selectedVenue = managedVenues.find((v) => v.id === venueId)
+      if (selectedVenue) {
+        // Build location string: "Venue Name, Address, City, State ZIP"
+        const parts = [selectedVenue.name, selectedVenue.address]
+        if (selectedVenue.city) parts.push(selectedVenue.city)
+        if (selectedVenue.state) {
+          const stateZip = selectedVenue.zip_code 
+            ? `${selectedVenue.state} ${selectedVenue.zip_code}`
+            : selectedVenue.state
+          parts.push(stateZip)
+        } else if (selectedVenue.zip_code) {
+          parts.push(selectedVenue.zip_code)
+        }
+        setLocation(parts.join(', '))
+      }
+    }
+  }, [venueId, managedVenues])
+
   // Load managed venues on mount
   useEffect(() => {
     const loadManagedVenues = async () => {

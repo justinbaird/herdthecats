@@ -17,6 +17,18 @@ export default function AdminContent({ user }: { user: User }) {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
   const [copyingLink, setCopyingLink] = useState(false)
+  const [editingVenue, setEditingVenue] = useState(false)
+  const [venueFormData, setVenueFormData] = useState({
+    name: '',
+    address: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    country: 'USA',
+    phone: '',
+    email: '',
+    website: '',
+  })
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [selectedUser, setSelectedUser] = useState<any>(null)
@@ -53,11 +65,77 @@ export default function AdminContent({ user }: { user: User }) {
       if (venuesError) throw new Error(venuesError)
       
       setVenues(venuesData || [])
-      if (venuesData && venuesData.length > 0) {
+      if (venuesData && venuesData.length > 0 && !selectedVenueId) {
         setSelectedVenueId(venuesData[0].id)
+        loadVenueDetails(venuesData[0].id)
       }
     } catch (error: any) {
       console.error('Error loading venues:', error)
+    }
+  }
+
+  const loadVenueDetails = async (venueId: string) => {
+    try {
+      const response = await fetch(`/api/venues/${venueId}`)
+      const { venue, error: venueError } = await response.json()
+      
+      if (venueError) throw new Error(venueError)
+      
+      if (venue) {
+        setVenueFormData({
+          name: venue.name || '',
+          address: venue.address || '',
+          city: venue.city || '',
+          state: venue.state || '',
+          zip_code: venue.zip_code || '',
+          country: venue.country || 'USA',
+          phone: venue.phone || '',
+          email: venue.email || '',
+          website: venue.website || '',
+        })
+      }
+    } catch (error: any) {
+      console.error('Error loading venue details:', error)
+    }
+  }
+
+  const handleVenueSelectChange = (venueId: string) => {
+    setSelectedVenueId(venueId)
+    loadVenueDetails(venueId)
+    setEditingVenue(false)
+  }
+
+  const handleSaveVenue = async () => {
+    if (!selectedVenueId) {
+      setError('Please select a venue')
+      return
+    }
+
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch(`/api/venues/${selectedVenueId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(venueFormData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update venue')
+      }
+
+      setSuccess('Venue updated successfully')
+      setEditingVenue(false)
+      await loadVenues()
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (error: any) {
+      console.error('Error updating venue:', error)
+      setError(error.message)
     }
   }
 
@@ -241,7 +319,7 @@ export default function AdminContent({ user }: { user: User }) {
                 <>
                   <select
                     value={selectedVenueId}
-                    onChange={(e) => setSelectedVenueId(e.target.value)}
+                    onChange={(e) => handleVenueSelectChange(e.target.value)}
                     className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
                   >
                     {venues.map((venue) => (
@@ -271,6 +349,199 @@ export default function AdminContent({ user }: { user: User }) {
           {success && (
             <div className="mb-4 rounded-md bg-green-50 p-4">
               <p className="text-sm text-green-800">{success}</p>
+            </div>
+          )}
+
+          {/* Venue Management Section */}
+          {venues.length > 0 && selectedVenueId && (
+            <div className="mb-6 rounded-lg bg-white p-6 shadow">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Venue Information
+                </h3>
+                {!editingVenue && (
+                  <button
+                    onClick={() => setEditingVenue(true)}
+                    className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                  >
+                    Edit Venue
+                  </button>
+                )}
+              </div>
+              {editingVenue ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Venue Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={venueFormData.name}
+                        onChange={(e) => setVenueFormData({ ...venueFormData, name: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Address *
+                      </label>
+                      <input
+                        type="text"
+                        value={venueFormData.address}
+                        onChange={(e) => setVenueFormData({ ...venueFormData, address: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        value={venueFormData.city}
+                        onChange={(e) => setVenueFormData({ ...venueFormData, city: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        value={venueFormData.state}
+                        onChange={(e) => setVenueFormData({ ...venueFormData, state: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        ZIP Code
+                      </label>
+                      <input
+                        type="text"
+                        value={venueFormData.zip_code}
+                        onChange={(e) => setVenueFormData({ ...venueFormData, zip_code: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Country
+                      </label>
+                      <input
+                        type="text"
+                        value={venueFormData.country}
+                        onChange={(e) => setVenueFormData({ ...venueFormData, country: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={venueFormData.phone}
+                        onChange={(e) => setVenueFormData({ ...venueFormData, phone: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={venueFormData.email}
+                        onChange={(e) => setVenueFormData({ ...venueFormData, email: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Website
+                      </label>
+                      <input
+                        type="url"
+                        value={venueFormData.website}
+                        onChange={(e) => setVenueFormData({ ...venueFormData, website: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                        placeholder="https://..."
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => {
+                        setEditingVenue(false)
+                        loadVenueDetails(selectedVenueId)
+                      }}
+                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveVenue}
+                      className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Venue Name</p>
+                    <p className="mt-1 text-sm text-gray-900">{venueFormData.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Address</p>
+                    <p className="mt-1 text-sm text-gray-900">{venueFormData.address}</p>
+                  </div>
+                  {venueFormData.city && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">City</p>
+                      <p className="mt-1 text-sm text-gray-900">{venueFormData.city}</p>
+                    </div>
+                  )}
+                  {venueFormData.state && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">State</p>
+                      <p className="mt-1 text-sm text-gray-900">{venueFormData.state}</p>
+                    </div>
+                  )}
+                  {venueFormData.zip_code && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">ZIP Code</p>
+                      <p className="mt-1 text-sm text-gray-900">{venueFormData.zip_code}</p>
+                    </div>
+                  )}
+                  {venueFormData.phone && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Phone</p>
+                      <p className="mt-1 text-sm text-gray-900">{venueFormData.phone}</p>
+                    </div>
+                  )}
+                  {venueFormData.email && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Email</p>
+                      <p className="mt-1 text-sm text-gray-900">{venueFormData.email}</p>
+                    </div>
+                  )}
+                  {venueFormData.website && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Website</p>
+                      <a href={venueFormData.website} target="_blank" rel="noopener noreferrer" className="mt-1 text-sm text-indigo-600 hover:text-indigo-800">
+                        {venueFormData.website}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
