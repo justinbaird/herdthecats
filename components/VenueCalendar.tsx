@@ -107,10 +107,10 @@ export default function VenueCalendar({ gigs, venueId, isManager }: VenueCalenda
                     <Link
                       key={gig.id}
                       href={`/gigs/${gig.id}`}
-                      className="block truncate rounded bg-indigo-100 px-1 py-0.5 text-xs text-indigo-800 hover:bg-indigo-200"
+                      className="block break-words rounded bg-indigo-100 px-1 py-0.5 text-xs text-indigo-800 hover:bg-indigo-200"
                       title={gig.title}
                     >
-                      {format(new Date(gig.datetime), 'HH:mm')} {gig.title}
+                      {gig.title}
                     </Link>
                   ))}
                   {dayGigs.length > 3 && (
@@ -177,10 +177,7 @@ export default function VenueCalendar({ gigs, venueId, isManager }: VenueCalenda
                         href={`/gigs/${gig.id}`}
                         className="block rounded-md bg-indigo-100 p-2 text-xs hover:bg-indigo-200"
                       >
-                        <div className="font-semibold text-indigo-900">
-                          {format(new Date(gig.datetime), 'HH:mm')}
-                        </div>
-                        <div className="mt-1 text-indigo-800">{gig.title}</div>
+                        <div className="break-words font-semibold text-indigo-800">{gig.title}</div>
                         {gig.location && (
                           <div className="mt-1 text-gray-600">{gig.location}</div>
                         )}

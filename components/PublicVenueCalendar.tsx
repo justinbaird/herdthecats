@@ -120,10 +120,10 @@ export default function PublicVenueCalendar({ venueId, venueName, hash }: Public
                   {dayGigs.slice(0, 3).map((gig) => (
                     <div
                       key={gig.id}
-                      className="truncate rounded bg-indigo-100 px-1 py-0.5 text-xs text-indigo-800"
+                      className="break-words rounded bg-indigo-100 px-1 py-0.5 text-xs text-indigo-800"
                       title={gig.title}
                     >
-                      {format(new Date(gig.datetime), 'HH:mm')} {gig.title}
+                      {gig.title}
                     </div>
                   ))}
                   {dayGigs.length > 3 && (
@@ -181,10 +181,7 @@ export default function PublicVenueCalendar({ venueId, venueName, hash }: Public
                         key={gig.id}
                         className="rounded-md bg-indigo-100 p-2 text-xs"
                       >
-                        <div className="font-semibold text-indigo-900">
-                          {format(new Date(gig.datetime), 'HH:mm')}
-                        </div>
-                        <div className="mt-1 text-indigo-800">{gig.title}</div>
+                        <div className="break-words font-semibold text-indigo-800">{gig.title}</div>
                         {gig.location && (
                           <div className="mt-1 text-xs text-gray-600">{gig.location}</div>
                         )}

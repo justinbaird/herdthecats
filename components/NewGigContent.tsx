@@ -288,12 +288,8 @@ export default function NewGigContent({ user, initialVenueId, initialDate, initi
         }
       }
 
-      // If venue gig, redirect back to venue calendar
-      if (venueId) {
-        router.push(`/venues/${venueId}`)
-      } else {
-        router.push(`/gigs/${data.id}`)
-      }
+      // Redirect to dashboard after creating gig
+      router.push('/dashboard')
     } catch (error: any) {
       console.error('Error creating gig:', error)
       setError(error.message)
