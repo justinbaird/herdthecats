@@ -43,11 +43,7 @@ CREATE POLICY "Musicians can upload media to gigs they have access to"
           WHERE g.id = gig_media.gig_id
           AND vm.user_id = auth.uid()
         )
-        OR EXISTS (
-          SELECT 1 FROM auth.users
-          WHERE id = auth.uid()
-          AND raw_user_meta_data->>'role' = 'admin'
-        )
+        OR is_admin()
       )
     )
   );
@@ -66,10 +62,6 @@ CREATE POLICY "Anyone can view gig media"
       )
     )
     OR gig_id IS NOT NULL
-    OR EXISTS (
-      SELECT 1 FROM auth.users
-      WHERE id = auth.uid()
-      AND raw_user_meta_data->>'role' = 'admin'
-    )
+    OR is_admin()
   );
 

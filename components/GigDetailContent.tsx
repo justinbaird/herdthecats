@@ -1143,69 +1143,35 @@ export default function GigDetailContent({
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Media Type
-                    </label>
-                    <select
-                      value={mediaType}
-                      onChange={(e) => {
-                        setMediaType(e.target.value as 'photo' | 'video')
-                        setSelectedFile(null)
-                      }}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                    >
-                      <option value="photo">Photo</option>
-                      <option value="video">Video</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Upload File *
-                    </label>
+                  <div className="flex justify-end">
                     <input
                       type="file"
-                      accept={mediaType === 'photo' ? 'image/*' : 'video/*'}
-                      onChange={(e) => {
+                      id="media-upload-input"
+                      accept="image/*,video/*"
+                      onChange={async (e) => {
                         const file = e.target.files?.[0]
-                        if (file) {
-                          setSelectedFile(file)
-                        }
-                      }}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                    />
-                    {selectedFile && (
-                      <p className="mt-1 text-xs text-gray-600">
-                        Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Description (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={mediaDescription}
-                      onChange={(e) => setMediaDescription(e.target.value)}
-                      placeholder="Brief description of this media..."
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      onClick={async () => {
-                        if (!selectedFile) {
-                          setError('Please select a file to upload')
+                        if (!file) return
+
+                        // Determine media type from file
+                        const isPhoto = file.type.startsWith('image/')
+                        const isVideo = file.type.startsWith('video/')
+                        
+                        if (!isPhoto && !isVideo) {
+                          setError('Please select an image or video file')
                           return
                         }
+
+                        const detectedMediaType = isPhoto ? 'photo' : 'video'
+                        setSelectedFile(file)
+                        setMediaType(detectedMediaType)
                         setUploadingMedia(true)
                         setError(null)
+                        
                         try {
                           // First upload the file
                           const uploadFormData = new FormData()
-                          uploadFormData.append('file', selectedFile)
-                          uploadFormData.append('mediaType', mediaType)
+                          uploadFormData.append('file', file)
+                          uploadFormData.append('mediaType', detectedMediaType)
 
                           const uploadResponse = await fetch('/api/media/upload', {
                             method: 'POST',
@@ -1223,7 +1189,7 @@ export default function GigDetailContent({
                               file_name: uploadData.file_name,
                               file_size: uploadData.file_size,
                               media_type: uploadData.media_type,
-                              description: mediaDescription.trim() || null,
+                              description: null,
                             }),
                           })
                           const data = await response.json()
@@ -1231,24 +1197,28 @@ export default function GigDetailContent({
                           setSuccess('Media uploaded successfully!')
                           setTimeout(() => setSuccess(null), 3000)
                           setSelectedFile(null)
-                          setMediaDescription('')
                           // Reload media
                           const mediaResponse = await fetch(`/api/gigs/${gigId}/media`)
                           if (mediaResponse.ok) {
                             const mediaData = await mediaResponse.json()
                             setMedia(mediaData.media || [])
                           }
+                          // Reset file input
+                          e.target.value = ''
                         } catch (err: any) {
                           setError(err.message || 'Failed to upload media')
                         } finally {
                           setUploadingMedia(false)
                         }
                       }}
-                      disabled={uploadingMedia || !selectedFile}
-                      className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="media-upload-input"
+                      className={`cursor-pointer rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${uploadingMedia ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {uploadingMedia ? 'Uploading...' : 'Upload Media'}
-                    </button>
+                    </label>
                   </div>
                 </div>
               </div>
